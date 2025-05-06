@@ -1,0 +1,29 @@
+-- Создание таблицы для хранения подозрительных запросов
+CREATE TABLE IF NOT EXISTS `suspicious_requests` (
+    `id` INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+    `ip` VARCHAR(45) NOT NULL,
+    `user_agent` VARCHAR(255) NOT NULL,
+    `request_uri` VARCHAR(255) NOT NULL,
+    `request_time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX (`ip`),
+    INDEX (`request_time`)
+) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Создание таблицы для хранения заблокированных IP
+CREATE TABLE IF NOT EXISTS `blocked_ips` (
+    `ip` VARCHAR(45) PRIMARY KEY,
+    `block_until` TIMESTAMP NOT NULL,
+    `reason` VARCHAR(255) NOT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `block_count` INT UNSIGNED NOT NULL DEFAULT 1,
+    `first_blocked_at` TIMESTAMP NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- Создание таблицы для отслеживания частоты запросов по IP
+CREATE TABLE IF NOT EXISTS `ip_request_rate` (
+    `ip` VARCHAR(45) PRIMARY KEY,
+    `request_count` INT UNSIGNED NOT NULL DEFAULT 1,
+    `first_request_time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `last_request_time` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    INDEX (`last_request_time`)
+) ENGINE=InnoDB CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
