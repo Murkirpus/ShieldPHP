@@ -50,14 +50,10 @@ crontab -e
    Deny from all
  </FilesMatch>
 
-For Nginx, add to the server configuration:
-```
+
 # DoS Protection
-location ~ \.php$ {
-fastcgi_param PHP_VALUE "auto_prepend_file=/path/to/your/site/dos/security_monitor.php";
-# ... other fastcgi settings
-}
-```
+
+require_once $_SERVER['DOCUMENT_ROOT'] . '/dos/security_monitor.php';
 
 ## Management
 
