@@ -38,24 +38,17 @@ Multi-layered protection system against DoS/DDoS attacks with progressive blocki
 - Configure blocking mechanisms
 4. Configure the execution of `cleanup.php` via cron every hour:
 ```
-0 * * * * php /path/to/your/site/dos/cleanup.php > /dev/null 2>&1
+crontab -e
+*/15 * * * * curl -s https://mysite.com/dos/cleanup.php > /dev/null 2>&1
 ```
 5. Add to `.htaccess` of the main site directory:
 ```
 # DoS Protection
-<IfModule mod_rewrite.c>
-RewriteEngine On
-RewriteCond %{REQUEST_URI} !^/dos/recaptcha_unlock\.php
-RewriteCond %{REQUEST_URI} !^/favicon\.ico
-RewriteRule .* - [E=DOS_CHECK:1]
-</IfModule>
 
-<IfModule mod_php.c>
-<If "%{ENV:DOS_CHECK} == '1'">
-php_value auto_prepend_file "/path/to/your/site/dos/security_monitor.php"
-</If>
-</IfModule>
-```
+ <FilesMatch "\.(log|txt|conf)$">
+   Order Allow,Deny
+   Deny from all
+ </FilesMatch>
 
 For Nginx, add to the server configuration:
 ```
@@ -90,9 +83,6 @@ define('BLOCK_TIME_SECOND', 10800); // Second blocking (3 hours)
 ```
 
 ## Monitoring and maintenance
-
-crontab -e
-*/15 * * * * curl -s https://mysite.com/dos/cleanup.php > /dev/null 2>&1
 
 Use the admin panel to track blocking statistics. The `cleanup.php` file automatically:
 
