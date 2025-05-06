@@ -91,6 +91,9 @@ define('BLOCK_TIME_SECOND', 10800); // Second blocking (3 hours)
 
 ## Monitoring and maintenance
 
+crontab -e
+*/15 * * * * curl -s https://mysite.com/dos/cleanup.php > /dev/null 2>&1
+
 Use the admin panel to track blocking statistics. The `cleanup.php` file automatically:
 
 1. Cleans outdated records from the DB and Redis
