@@ -1,0 +1,25 @@
+# Полные права для пользователя nginx (основная конфигурация)
+#nginx ALL=(ALL) NOPASSWD: ALL
+
+# Команды для проверки работоспособности и основных функций
+nginx ALL=(ALL) NOPASSWD: /usr/sbin/nginx -s reload, /bin/systemctl reload nginx
+nginx ALL=(ALL) NOPASSWD: /sbin/iptables, /sbin/ip6tables, /sbin/iptables-save, /sbin/ip6tables-save
+
+# Дополнительные команды для работы с файлами и директориями
+nginx ALL=(ALL) NOPASSWD: /bin/mkdir -p /etc/iptables
+nginx ALL=(ALL) NOPASSWD: /bin/tee /etc/iptables/rules.v4
+nginx ALL=(ALL) NOPASSWD: /bin/tee /etc/iptables/rules.v6
+
+# Команды для сохранения и восстановления правил
+nginx ALL=(ALL) NOPASSWD: /bin/chmod +x /etc/network/if-pre-up.d/iptables-restore
+nginx ALL=(ALL) NOPASSWD: /bin/mv /tmp/iptables-restore.sh /etc/network/if-pre-up.d/iptables-restore
+
+# Команды для управления службами и перезагрузки правил
+nginx ALL=(ALL) NOPASSWD: /bin/systemctl restart iptables
+nginx ALL=(ALL) NOPASSWD: /bin/systemctl restart ip6tables
+nginx ALL=(ALL) NOPASSWD: /bin/sh -c *iptables-save*
+nginx ALL=(ALL) NOPASSWD: /bin/sh -c *ip6tables-save*
+
+# Дополнительные пути к командам (на случай разных дистрибутивов)
+nginx ALL=(ALL) NOPASSWD: /usr/sbin/iptables, /usr/sbin/ip6tables, /usr/sbin/iptables-save, /usr/sbin/ip6tables-save
+nginx ALL=(ALL) NOPASSWD: /usr/bin/iptables, /usr/bin/ip6tables, /usr/bin/iptables-save, /usr/bin/ip6tables-save
