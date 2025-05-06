@@ -759,11 +759,14 @@ if (file_exists($this->dos_dir . 'block_escalation.php')) {
             exit;
         }
         
-        // Проверяем только подозрительные запросы
-        if ($this->isRequestSuspicious()) {
-            $this->logRequestRedis(); // Логируем только подозрительные запросы
-            $this->checkSuspiciousActivityRedis();
-        }
+// Вызываем метод и сохраняем его результат в переменную
+$is_suspicious = $this->isRequestSuspicious();
+
+// Если запрос подозрительный и функция не блокировала бота, логируем
+if ($is_suspicious === true) {
+    $this->logRequestRedis(); // Логируем только подозрительные запросы
+    $this->checkSuspiciousActivityRedis();
+}
         
         // Проверка состояния памяти Redis и очистка при необходимости
         if (method_exists($this, 'checkRedisMemory')) {
@@ -797,12 +800,15 @@ if (file_exists($this->dos_dir . 'block_escalation.php')) {
                 exit;
             }
             
-            // Проверяем только подозрительные запросы
-            if ($this->isRequestSuspicious()) {
-                $this->initializeTables();
-                $this->logRequest(); // Логируем только подозрительные запросы
-                $this->checkSuspiciousActivity();
-            }
+// Вызываем метод и сохраняем его результат в переменную
+$is_suspicious = $this->isRequestSuspicious();
+
+// Если запрос подозрительный и функция не блокировала бота, логируем
+if ($is_suspicious === true) {
+    $this->initializeTables();
+    $this->logRequest(); // Логируем только подозрительные запросы
+    $this->checkSuspiciousActivity();
+}
         }
         // Если и база недоступна, используем файловый режим с прямыми блокировками
         else if (method_exists($this, 'checkIPRateLimitFile') && $this->checkIPRateLimitFile()) {
@@ -1868,7 +1874,10 @@ private function checkTotalRequestsPerIPFile($limit = null) {
     /**
      * Быстрая предварительная проверка подозрительности запроса
      */
-    private function isRequestSuspicious() {
+    /**
+ * Быстрая предварительная проверка подозрительности запроса
+ */
+private function isRequestSuspicious() {
     // Если запрос направлен в админку или на страницу разблокировки, не считаем его подозрительным
     if (strpos($_SERVER['REQUEST_URI'], '/dos/admin.php') !== false ||
         strpos($_SERVER['REQUEST_URI'], '/dos/recaptcha_unlock.php') !== false) {
@@ -1898,7 +1907,18 @@ private function checkTotalRequestsPerIPFile($limit = null) {
     
     // Проверка empty User-Agent
     if (empty($user_agent)) {
-        return true;
+        // НОВЫЙ КОД: Блокируем на третьем уровне вместо возврата true
+        $reason = "Пустой User-Agent";
+        error_log("Блокировка IP {$this->ip} с {$reason}");
+        
+        if ($this->useRedis && $this->redis) {
+            $this->blockIPRedis(BLOCK_TIME_THIRD, $reason);
+        } else {
+            $this->connectDB();
+            $this->blockIP(BLOCK_TIME_THIRD, $reason);
+        }
+        $this->redirectToUnlockPage();
+        exit;
     }
     
     // Проверка на типичные признаки бота
@@ -1906,57 +1926,75 @@ private function checkTotalRequestsPerIPFile($limit = null) {
     $bot_terms = array('bot', 'crawler', 'spider', 'grab', 'download', 'fetch', 'parser');
     foreach ($bot_terms as $term) {
         if (strpos($ua, $term) !== false) {
-            return true;
+            // НОВЫЙ КОД: Блокируем на третьем уровне вместо возврата true
+            $reason = "Неподтвержденный бот: {$term}";
+            error_log("Блокировка IP {$this->ip} с {$reason}: {$ua}");
+            
+            if ($this->useRedis && $this->redis) {
+                $this->blockIPRedis(BLOCK_TIME_THIRD, $reason);
+            } else {
+                $this->connectDB();
+                $this->blockIP(BLOCK_TIME_THIRD, $reason);
+            }
+            
+            // Добавляем в список жестких блокировок для дополнительной защиты
+            $this->addToHardBlockList($this->ip, $reason);
+            
+            // Применяем все доступные методы блокировки
+            $this->applyExternalBlockings($this->ip);
+            
+            $this->redirectToUnlockPage();
+            exit;
         }
     }
         
-        // Инициализируем сессию
-        if (session_status() == PHP_SESSION_NONE) {
-            if (version_compare(PHP_VERSION, '7.1.0', '>=')) {
-                ini_set('session.use_strict_mode', 1);
-            }
-            session_start();
+    // Инициализируем сессию
+    if (session_status() == PHP_SESSION_NONE) {
+        if (version_compare(PHP_VERSION, '7.1.0', '>=')) {
+            ini_set('session.use_strict_mode', 1);
         }
-        
-        // Инициализируем счетчики запросов
-        if (!isset($_SESSION['last_request_time'])) {
-            $_SESSION['last_request_time'] = microtime(true);
-            $_SESSION['request_count'] = 1;
-            $_SESSION['requests_log'] = array();
-            return false;
-        }
-        
-        // Логируем время запроса
-        $current_time = microtime(true);
-        $_SESSION['requests_log'][] = $current_time;
-        
-        // Оставляем только последние 20 запросов
-        if (count($_SESSION['requests_log']) > 20) {
-            $_SESSION['requests_log'] = array_slice($_SESSION['requests_log'], -20);
-        }
-        
-        // Увеличиваем счетчик запросов
-        $_SESSION['request_count']++;
-        
-        // Проверка частоты запросов за последнюю секунду
-        $requests_last_second = 0;
-        foreach ($_SESSION['requests_log'] as $time) {
-            if ($current_time - $time <= 1) {
-                $requests_last_second++;
-            }
-        }
-        
-        // Если более N запросов за секунду - подозрительно
-        $threshold = defined('MAX_REQUESTS_PER_SECOND') ? MAX_REQUESTS_PER_SECOND * 1.5 : 12;
-        if ($requests_last_second >= $threshold) {
-            return true;
-        }
-        
-        // Обновляем время последнего запроса
-        $_SESSION['last_request_time'] = $current_time;
-        
+        session_start();
+    }
+    
+    // Инициализируем счетчики запросов
+    if (!isset($_SESSION['last_request_time'])) {
+        $_SESSION['last_request_time'] = microtime(true);
+        $_SESSION['request_count'] = 1;
+        $_SESSION['requests_log'] = array();
         return false;
     }
+    
+    // Логируем время запроса
+    $current_time = microtime(true);
+    $_SESSION['requests_log'][] = $current_time;
+    
+    // Оставляем только последние 20 запросов
+    if (count($_SESSION['requests_log']) > 20) {
+        $_SESSION['requests_log'] = array_slice($_SESSION['requests_log'], -20);
+    }
+    
+    // Увеличиваем счетчик запросов
+    $_SESSION['request_count']++;
+    
+    // Проверка частоты запросов за последнюю секунду
+    $requests_last_second = 0;
+    foreach ($_SESSION['requests_log'] as $time) {
+        if ($current_time - $time <= 1) {
+            $requests_last_second++;
+        }
+    }
+    
+    // Если более N запросов за секунду - подозрительно
+    $threshold = defined('MAX_REQUESTS_PER_SECOND') ? MAX_REQUESTS_PER_SECOND * 1.5 : 12;
+    if ($requests_last_second >= $threshold) {
+        return true;
+    }
+    
+    // Обновляем время последнего запроса
+    $_SESSION['last_request_time'] = $current_time;
+    
+    return false;
+}
     
     /**
      * Логирование подозрительных запросов в Redis
