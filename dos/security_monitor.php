@@ -42,7 +42,49 @@ private function checkHoneypotUrl() {
         '/wp-config.php',
         '/laravel/.env',
         '/phpinfo.php',
-        '/wp-json/'
+        '/wp-json/',
+        
+        // Добавляем новые паттерны сканирования
+        '/admin/',
+        '/administrator/',
+        '/phpmyadmin/',
+        '/setup/',
+        '/install/',
+        '/backup/',
+        '/db/',
+        '/database/',
+        '/config/',
+        '/.htaccess',
+        '/.sql',
+        '/zabbix/',
+        '/1.git',
+        '/2.git',
+        '/3.git',
+        '/4.git',
+        '/5.git',
+        '/admin/1.git',
+        '/admin/2.git',
+        '/admin/3.git',
+        '/bitrix/',
+        '/manager/',
+        '/joomla/',
+        '/cms/',
+        '/panel/',
+        '/cpanel/',
+        '/webshell.php',
+        '/shell.php',
+        '/cmd.php',
+        '/c99.php',
+        '/r57.php',
+        '/webroot/',
+        '/includes/',
+        '/old/',
+        '/backup.sql',
+        '/dump.sql',
+        '/website.sql',
+        '/myadmin/',
+        '/mysql/',
+        '/sql/'
     );
     
     // Проверяем текущий URL
@@ -55,6 +97,31 @@ private function checkHoneypotUrl() {
                 error_log("Обнаружен доступ к Honeypot URL: {$current_url} с IP {$this->ip}");
                 return true;
             }
+        }
+    }
+    
+    // Кроме того, проверяем URL с помощью регулярных выражений для более сложных паттернов
+    $regex_patterns = array(
+        '#/\.git#i',
+        '#\.git$#i',
+        '#\d+\.git#i',
+        '#/\.env#i',
+        '#/\.config#i',
+        '#/\.settings#i',
+        '#\.bak$#i',
+        '#\.old$#i',
+        '#\.backup$#i',
+        '#/\.svn#i',
+        '#/node_modules#i',
+        '#/vendor/#i',
+        '#/\.webpack#i',
+        '#/\.npm#i'
+    );
+    
+    foreach ($regex_patterns as $pattern) {
+        if (preg_match($pattern, $current_url)) {
+            error_log("Обнаружен доступ к Honeypot URL (regex): {$current_url} с IP {$this->ip}");
+            return true;
         }
     }
     
