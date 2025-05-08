@@ -1,0 +1,135 @@
+User-agent: *
+Disallow: /cgi-bin/
+Disallow: /temp/
+Disallow: /tmp/
+Disallow: /_baks/
+Disallow: /_old/
+Disallow: /_backups/
+
+# Разрешенные для индексации директории
+Allow: /images/
+Allow: /css/
+Allow: /js/
+Allow: /uploads/
+
+# Защищенные директории
+Disallow: /dos/
+Disallow: /security/
+Disallow: /protected/
+
+# Honeypot-директории (приманки для ботов)
+# Обычно боты игнорируют запреты в robots.txt при поиске уязвимостей,
+# но эти директории будут заманивать их в ловушки и приводить к блокировке
+Disallow: /admin/
+Disallow: /administrator/
+Disallow: /wp-admin/
+Disallow: /wp-login/
+Disallow: /phpmyadmin/
+Disallow: /mysql/
+Disallow: /database/
+Disallow: /db/
+Disallow: /manager/
+Disallow: /panel/
+Disallow: /cpanel/
+Disallow: /webmail/
+Disallow: /config/
+Disallow: /settings/
+Disallow: /install/
+Disallow: /setup/
+Disallow: /.git/
+Disallow: /.svn/
+Disallow: /.env
+Disallow: /backup/
+Disallow: /backups/
+Disallow: /old/
+Disallow: /temp/
+Disallow: /debug/
+Disallow: /dev/
+Disallow: /api/v1/
+Disallow: /api/v2/
+Disallow: /includes/
+Disallow: /vendor/
+Disallow: /node_modules/
+Disallow: /private/
+Disallow: /files/
+Disallow: /zabbix/
+Disallow: /bitrix/
+Disallow: /joomla/
+Disallow: /drupal/
+Disallow: /wordpress/
+Disallow: /wp/
+Disallow: /laravel/
+Disallow: /phpinfo/
+Disallow: /login/
+Disallow: /signup/
+Disallow: /register/
+Disallow: /cron/
+
+# Специфические файлы-приманки
+Disallow: /wp-config.php
+Disallow: /config.php
+Disallow: /configuration.php
+Disallow: /settings.php
+Disallow: /db.php
+Disallow: /connect.php
+Disallow: /functions.php
+Disallow: /.htaccess
+Disallow: /.htpasswd
+Disallow: /README.md
+Disallow: /CHANGELOG.txt
+Disallow: /INSTALL.txt
+Disallow: /web.config
+Disallow: /composer.json
+Disallow: /package.json
+Disallow: /phpinfo.php
+Disallow: /info.php
+Disallow: /test.php
+Disallow: /dump.sql
+Disallow: /backup.sql
+
+# Запрет сканирования определенных типов файлов
+Disallow: /*.sql$
+Disallow: /*.bak$
+Disallow: /*.backup$
+Disallow: /*.log$
+Disallow: /*.conf$
+Disallow: /*.config$
+Disallow: /*.old$
+Disallow: /*.orig$
+Disallow: /*.swp$
+Disallow: /*.tar$
+Disallow: /*.tar.gz$
+Disallow: /*.gz$
+Disallow: /*.zip$
+Disallow: /*.rar$
+
+# Запрет индексации определенных параметров URL
+Disallow: /*?*login=
+Disallow: /*?*username=
+Disallow: /*?*password=
+Disallow: /*?*email=
+Disallow: /*?*user=
+Disallow: /*?*admin=
+Disallow: /*?*cmd=
+Disallow: /*?*sql=
+Disallow: /*?*debug=
+Disallow: /*?*test=
+Disallow: /*?*demo=
+
+# Настройки для Яндекса
+User-agent: Yandex
+Clean-param: utm_source&utm_medium&utm_campaign&utm_content&utm_term
+Clean-param: yclid
+
+# Настройки для Google
+User-agent: Googlebot
+Disallow: /*?*gclid=
+Disallow: /*?*utm_source=
+Disallow: /*?*utm_medium=
+Disallow: /*?*utm_campaign=
+
+# Карта сайта
+Sitemap: https://ваш-сайт.ru/sitemap.xml
+
+# Хост (для Яндекса)
+Host: https://ваш-сайт.ru
