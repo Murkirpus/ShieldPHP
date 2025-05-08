@@ -455,7 +455,15 @@ $settingsCategories = [
         'settings' => [
             'ENABLE_UA_CONSISTENCY_CHECK', 'UA_MAX_DIFFERENT', 'UA_CHECK_WINDOW'
         ]
+    ],
+	'errors_404' => [
+        'title' => 'Защита от 404-атак',
+        'icon' => 'exclamation-triangle',
+        'settings' => [
+            'MAX_404_ERRORS', 'ERROR_404_WINDOW'
+        ]
     ]
+	
 ];
 // Получение описаний констант из файла settings.php
 function getConstantDescriptions() {
