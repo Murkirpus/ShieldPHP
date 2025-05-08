@@ -39,7 +39,7 @@ Multi-layered protection system against DoS/DDoS attacks with progressive blocki
 4. Configure the execution of `cleanup.php` via cron every hour:
 ```
 crontab -e
-*/15 * * * * curl -s https://mysite.com/dos/cleanup.php > /dev/null 2>&1
+*/15 * * * * curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36" https://mysite.com/dos/cleanup.php > /dev/null 2>&1
 ```
 5. Add to `.htaccess` of the main site directory:
 ```
