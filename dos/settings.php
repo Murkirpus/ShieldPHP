@@ -42,7 +42,7 @@ define('CLEANUP_IPTABLES_DUPLICATES', true);     // Включить очист�
 define('MAX_DUPLICATES_TO_KEEP', 1);             // Максимальное количество правил для одного IP
 
 // Начало - Настройки API для блокировки IP
-define('API_BLOCK_URL', 'https://kinoprostor.tv/dos/iptables.php'); // URL API для блокировки
+define('API_BLOCK_URL', 'https://mysite.com/dos/iptables.php'); // URL API для блокировки
 define('API_BLOCK_KEY', 'api_key'); // Ключ API для блокировки (должен совпадать с ключом в iptables.php)
 define('API_USER_AGENT', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'); // User-Agent для запросов
 // Настройки распределения нагрузки API запросов
@@ -115,7 +115,7 @@ define('AUTO_HARD_BLOCK_ACTION', 'iptables'); // Метод жесткой бл�
 define('AUTO_HARD_BLOCK_NOTIFY_ADMIN', true);  // Отправлять уведомления администратору
 define('AUTO_HARD_BLOCK_ADMIN_EMAIL', 'info@murkir.pp.ua');  // Email администратора (ЗАМЕНИТЕ НА СВОЙ)
 define('AUTO_HARD_BLOCK_EMAIL_SUBJECT', 'ВНИМАНИЕ: Активирована автоматическая жесткая блокировка');  // Тема письма
-define('AUTO_HARD_BLOCK_EMAIL_FROM', 'security@' . (isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'info@kinoprostor.tv'));  // Email отправителя
+define('AUTO_HARD_BLOCK_EMAIL_FROM', 'security@' . (isset($_SERVER['HTTP_HOST']) ? $_SERVER['HTTP_HOST'] : 'info@mysite.com'));  // Email отправителя
 define('AUTO_HARD_BLOCK_NOTIFY_INTERVAL', 24);  // Минимальный интервал между уведомлениями (в часах)
 
 // Отключить использование файлового кеша как запасного варианта
