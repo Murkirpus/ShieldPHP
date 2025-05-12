@@ -341,10 +341,8 @@ class SecurityAdmin {
         // Получаем общее количество заблокированных IP
         $total = count($blockedList);
         
-        // Реализуем пагинацию на уровне PHP, так как Redis не поддерживает OFFSET в zRangeByScore напрямую
-        if ($limit !== null && $offset !== null) {
-            $blockedList = array_slice($blockedList, $offset, $limit, true);
-        }
+        // Подготовим массив для сортировки по времени создания
+        $blockInfos = array();
         
         foreach ($blockedList as $ip => $blockUntil) {
             $blockKey = $this->prefix . "blocked_ip:$ip";
@@ -363,20 +361,32 @@ class SecurityAdmin {
             $blockInfo['created_at'] = (int)$blockInfo['created_at'];
             $blockInfo['first_blocked_at'] = (int)$blockInfo['first_blocked_at'];
             
-            // Преобразуем временные метки в MySQL datetime формат для единообразия с MariaDB
-            $blockInfo['block_until'] = date('Y-m-d H:i:s', $blockInfo['block_until']);
-            $blockInfo['created_at'] = date('Y-m-d H:i:s', $blockInfo['created_at']);
-            $blockInfo['first_blocked_at'] = date('Y-m-d H:i:s', $blockInfo['first_blocked_at']);
-            
             // Добавляем IP в blockInfo
             $blockInfo['ip'] = $ip;
             
-            // Добавляем в результат
-            $blockedIps[] = $blockInfo;
+            // Добавляем в массив для сортировки
+            $blockInfos[] = $blockInfo;
+        }
+        
+        // Сортируем по времени создания (от новых к старым)
+        usort($blockInfos, function($a, $b) {
+            return $b['created_at'] - $a['created_at'];
+        });
+        
+        // Реализуем пагинацию на уровне PHP
+        if ($limit !== null && $offset !== null) {
+            $blockInfos = array_slice($blockInfos, $offset, $limit, true);
+        }
+        
+        // Преобразуем временные метки в MySQL datetime формат для единообразия с MariaDB
+        foreach ($blockInfos as &$blockInfo) {
+            $blockInfo['block_until'] = date('Y-m-d H:i:s', $blockInfo['block_until']);
+            $blockInfo['created_at'] = date('Y-m-d H:i:s', $blockInfo['created_at']);
+            $blockInfo['first_blocked_at'] = date('Y-m-d H:i:s', $blockInfo['first_blocked_at']);
         }
         
         return [
-            'data' => $blockedIps,
+            'data' => $blockInfos,
             'total' => $total
         ];
     } catch (Exception $e) {
@@ -410,12 +420,12 @@ class SecurityAdmin {
         $total = $countStmt->fetchColumn();
         
         // Запрос с учетом пагинации
-        $sql = "
-            SELECT ip, block_until, reason, created_at, block_count, first_blocked_at 
-            FROM blocked_ips 
-            WHERE block_until > NOW()
-            ORDER BY block_until DESC
-        ";
+		$sql = "
+    SELECT ip, block_until, reason, created_at, block_count, first_blocked_at 
+    FROM blocked_ips 
+    WHERE block_until > NOW()
+    ORDER BY created_at DESC, block_until DESC
+	";
         
         // Добавляем LIMIT только если указаны оба параметра
         if ($limit !== null && $offset !== null) {
