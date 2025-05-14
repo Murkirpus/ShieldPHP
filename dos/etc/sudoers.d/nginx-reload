@@ -1,2 +1,2 @@
-nginx ALL=(ALL) NOPASSWD: /usr/sbin/nginx -s reload
+www-data ALL=(ALL) NOPASSWD: /usr/sbin/nginx -s reload
 
