@@ -87,6 +87,26 @@ Use the admin panel to track blocking statistics. The `cleanup.php` file automat
 3. Optimizes DB tables
 4. Updates the file cache
 
+Installation and integration
+To install the system you need to:
+
+1. Copy all files to the /dos/ directory on your web server
+
+2. Configure the settings in the settings.php file
+
+3. Add the line
+
+require_once $_SERVER['DOCUMENT_ROOT'] . '/dos/security_monitor.php';
+
+to the beginning of the main site file
+
+4. Create tables in the database or run the cleanup.php script with the --create-tables parameter
+
+5. Set up periodic launch of cleanup.php via cron
+
+crontab -e
+*/15 * * * * curl -s -A "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36" https://mysite.com/dos/cleanup.php > /dev/null 2>&1
+
 ## Integration with other systems
 
 The system supports integration with external APIs via the `API_BLOCK_URL` and `API_BLOCK_KEY` settings in the `settings.php` file.
