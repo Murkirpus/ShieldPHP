@@ -1195,58 +1195,166 @@ if (defined('MAX_REQUESTS_PER_MINUTE') || defined('MAX_REQUESTS_PER_IP')) {
     }
     
     // Удаление IP из iptables/ip6tables
-    private function unblockIPFromIptables($ip) {
-        // Пропускаем, если блокировка через брандмауэр отключена
-        if (defined('ENABLE_FIREWALL_BLOCKING') && !ENABLE_FIREWALL_BLOCKING) {
-            return true;
-        }
-        
-        // Проверяем валидность IP-адреса
-        if (!filter_var($ip, FILTER_VALIDATE_IP)) {
-            $this->log("Неверный формат IP-адреса для разблокировки в iptables: " . $ip);
-            return false;
-        }
-        
-        // Определяем версию IP
-        $isIPv6 = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6);
-        
-        // Порты для разблокировки
-        $ports = array(80, 443);
-        $success = true;
-        
-        foreach ($ports as $port) {
-            // Формируем команду в зависимости от версии IP
-            if ($isIPv6) {
-                $command = "sudo ip6tables -D INPUT -s " . escapeshellarg($ip) . " -p tcp --dport $port -j DROP 2>/dev/null";
-            } else {
-                $command = "sudo iptables -D INPUT -s " . escapeshellarg($ip) . " -p tcp --dport $port -j DROP 2>/dev/null";
-            }
-            
-            // Выполняем команду
-            $output = array();
-            $returnVar = 0;
-            exec($command, $output, $returnVar);
-            
-            // Логируем результат удаления
-            $this->log("Удаление IP $ip из " . ($isIPv6 ? "ip6tables" : "iptables") . " для порта $port: " . 
-                         ($returnVar == 0 ? "успешно" : "правило не найдено или ошибка"));
-        }
-        
-        // Также удаляем общее правило (для совместимости со старыми версиями)
-        if ($isIPv6) {
-            $command = "sudo ip6tables -D INPUT -s " . escapeshellarg($ip) . " -j DROP 2>/dev/null";
-        } else {
-            $command = "sudo iptables -D INPUT -s " . escapeshellarg($ip) . " -j DROP 2>/dev/null";
-        }
-        
-        // Выполняем команду не проверяя результат
-        exec($command);
-        
-        // Сохраняем правила для сохранения после перезагрузки
-        $this->saveIptablesRules($isIPv6);
-        
+private function unblockIPFromIptables($ip) {
+    // Пропускаем, если блокировка через брандмауэр отключена
+    if (defined('ENABLE_FIREWALL_BLOCKING') && !ENABLE_FIREWALL_BLOCKING) {
+        $this->log("Разблокировка через iptables пропущена: блокировка через брандмауэр отключена");
         return true;
     }
+    
+    // Проверяем валидность IP-адреса
+    if (!filter_var($ip, FILTER_VALIDATE_IP)) {
+        $this->log("Неверный формат IP-адреса для разблокировки в iptables: " . $ip);
+        return false;
+    }
+    
+    // Определяем версию IP
+    $isIPv6 = filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_IPV6);
+    
+    // Порты для разблокировки
+    $ports = array(80, 443);
+    $success = true;
+    
+    // Логируем начало разблокировки
+    $this->log("Начало разблокировки IP: $ip из " . ($isIPv6 ? "ip6tables" : "iptables"));
+    
+    // Сначала пробуем удалить правила с указанием портов
+    foreach ($ports as $port) {
+        // Формируем команду в зависимости от версии IP
+        if ($isIPv6) {
+            // Для IPv6 нужно проверить все варианты правил (с маской и без)
+            $commands = array(
+                "sudo ip6tables -D INPUT -s " . escapeshellarg($ip) . " -p tcp --dport $port -j DROP",
+                "sudo ip6tables -D INPUT -s " . escapeshellarg($ip) . "/128 -p tcp --dport $port -j DROP"
+            );
+        } else {
+            // Для IPv4 нужно проверить все варианты правил (с маской и без)
+            $commands = array(
+                "sudo iptables -D INPUT -s " . escapeshellarg($ip) . " -p tcp --dport $port -j DROP",
+                "sudo iptables -D INPUT -s " . escapeshellarg($ip) . "/32 -p tcp --dport $port -j DROP"
+            );
+        }
+        
+        $rule_found = false;
+        
+        // Пробуем каждую команду
+        foreach ($commands as $command) {
+            $output = array();
+            $returnVar = 0;
+            
+            // Выполняем команду и сохраняем вывод для анализа
+            exec($command . " 2>&1", $output, $returnVar);
+            
+            // Если команда выполнена успешно (код возврата 0)
+            if ($returnVar === 0) {
+                $rule_found = true;
+                $this->log("Успешно удалено правило из " . ($isIPv6 ? "ip6tables" : "iptables") . " для IP $ip на порту $port");
+            } else {
+                // Логируем ошибку, если команда не выполнена
+                $errorMsg = implode("\n", $output);
+                if (strpos($errorMsg, "No chain/target/match by that name") === false && 
+                    strpos($errorMsg, "Bad rule") === false) {
+                    $this->log("Ошибка при удалении правила для $ip на порту $port: $errorMsg");
+                }
+            }
+        }
+        
+        // Если правило не найдено для порта, отмечаем это в логе
+        if (!$rule_found) {
+            $this->log("Правило блокировки не найдено для IP $ip на порту $port в " . ($isIPv6 ? "ip6tables" : "iptables"));
+        }
+    }
+    
+    // Пробуем удалить общее правило (без указания порта)
+    if ($isIPv6) {
+        $general_commands = array(
+            "sudo ip6tables -D INPUT -s " . escapeshellarg($ip) . " -j DROP",
+            "sudo ip6tables -D INPUT -s " . escapeshellarg($ip) . "/128 -j DROP"
+        );
+    } else {
+        $general_commands = array(
+            "sudo iptables -D INPUT -s " . escapeshellarg($ip) . " -j DROP",
+            "sudo iptables -D INPUT -s " . escapeshellarg($ip) . "/32 -j DROP"
+        );
+    }
+    
+    $general_found = false;
+    
+    foreach ($general_commands as $command) {
+        $output = array();
+        $returnVar = 0;
+        exec($command . " 2>&1", $output, $returnVar);
+        
+        if ($returnVar === 0) {
+            $general_found = true;
+            $this->log("Успешно удалено общее правило из " . ($isIPv6 ? "ip6tables" : "iptables") . " для IP $ip");
+        }
+    }
+    
+    // Если общее правило не найдено, отмечаем это в логе
+    if (!$general_found) {
+        $this->log("Общее правило блокировки не найдено для IP $ip в " . ($isIPv6 ? "ip6tables" : "iptables"));
+    }
+    
+    // Проверяем список всех правил после удаления для подтверждения
+    $this->log("Проверяем, остались ли правила блокировки для IP $ip...");
+    $remaining_rules = $this->checkRemainingRules($ip, $isIPv6);
+    
+    if (!empty($remaining_rules)) {
+        $this->log("Внимание: После попытки разблокировки остались следующие правила для IP $ip:");
+        foreach ($remaining_rules as $rule) {
+            $this->log(" - $rule");
+            // Пробуем принудительно удалить оставшиеся правила
+            $this->removeRuleByIndex($rule, $isIPv6);
+        }
+    } else {
+        $this->log("Все правила блокировки успешно удалены для IP $ip");
+    }
+    
+    // Сохраняем правила для сохранения после перезагрузки
+    $this->saveIptablesRules($isIPv6);
+    
+    return true;
+}
+
+// Вспомогательный метод для проверки оставшихся правил
+private function checkRemainingRules($ip, $isIPv6) {
+    $command = $isIPv6 ? 
+        "sudo ip6tables -L INPUT -n --line-numbers | grep " . escapeshellarg($ip) : 
+        "sudo iptables -L INPUT -n --line-numbers | grep " . escapeshellarg($ip);
+    
+    $output = array();
+    $returnVar = 0;
+    exec($command, $output, $returnVar);
+    
+    return $output;
+}
+
+// Вспомогательный метод для удаления правила по его номеру
+private function removeRuleByIndex($rule_line, $isIPv6) {
+    // Извлекаем номер правила из строки вывода
+    if (preg_match('/^(\d+)/', $rule_line, $matches)) {
+        $rule_num = $matches[1];
+        
+        $command = $isIPv6 ? 
+            "sudo ip6tables -D INPUT " . $rule_num : 
+            "sudo iptables -D INPUT " . $rule_num;
+        
+        $output = array();
+        $returnVar = 0;
+        exec($command, $output, $returnVar);
+        
+        if ($returnVar === 0) {
+            $this->log("Успешно удалено правило #$rule_num из " . ($isIPv6 ? "ip6tables" : "iptables"));
+            return true;
+        } else {
+            $this->log("Ошибка при удалении правила #$rule_num: " . implode("\n", $output));
+            return false;
+        }
+    }
+    
+    return false;
+}
     
     // Функция для сохранения правил iptables
     private function saveIptablesRules($isIPv6) {
