@@ -670,39 +670,52 @@ public function monitorRequest() {
     }
 	
 	// ДОБАВЛЯЕМ ЗДЕСЬ: Новые проверки
-    // 1. Проверка количества запросов в минуту
-    if ($this->checkRequestsPerMinute()) {
-        // Если превышен лимит запросов в минуту
-        if ($this->useRedis && $this->redis) {
-            $this->blockIPRedis(BLOCK_TIME_FIRST, 'Превышен лимит запросов в минуту');
-        } else {
-            $this->connectDB();
-            $this->blockIP(BLOCK_TIME_FIRST, 'Превышен лимит запросов в минуту');
-        }
-        $this->redirectToUnlockPage();
-        exit;
+// 1. Проверка количества запросов в минуту
+if ($this->checkRequestsPerMinute()) {
+    // Если превышен лимит запросов в минуту
+    if ($this->useRedis && $this->redis) {
+        // Добавляем логирование
+        $this->logRequestRedis();
+        $this->blockIPRedis(BLOCK_TIME_FIRST, 'Превышен лимит запросов в минуту');
+    } else {
+        $this->connectDB();
+        // Добавляем логирование
+        $this->initializeTables();
+        $this->logRequest();
+        $this->blockIP(BLOCK_TIME_FIRST, 'Превышен лимит запросов в минуту');
     }
+    $this->redirectToUnlockPage();
+    exit;
+}
     
-    // 2. Проверка общего количества запросов с IP
-    if ($this->checkTotalRequestsPerIP()) {
-        // Если превышен общий лимит запросов
-        if ($this->useRedis && $this->redis) {
-            $this->blockIPRedis(BLOCK_TIME_FIRST, 'Превышен общий лимит запросов с IP');
-        } else {
-            $this->connectDB();
-            $this->blockIP(BLOCK_TIME_FIRST, 'Превышен общий лимит запросов с IP');
-        }
-        $this->redirectToUnlockPage();
-        exit;
+// 2. Проверка общего количества запросов с IP
+if ($this->checkTotalRequestsPerIP()) {
+    // Если превышен общий лимит запросов
+    if ($this->useRedis && $this->redis) {
+        // Добавляем логирование
+        $this->logRequestRedis();
+        $this->blockIPRedis(BLOCK_TIME_FIRST, 'Превышен общий лимит запросов с IP');
+    } else {
+        $this->connectDB();
+        // Добавляем логирование
+        $this->initializeTables();
+        $this->logRequest();
+        $this->blockIP(BLOCK_TIME_FIRST, 'Превышен общий лимит запросов с IP');
     }
+    $this->redirectToUnlockPage();
+    exit;
+}
 	
 	// Проверка на Honeypot URL
 if ($this->checkHoneypotUrl()) {
-    // Блокируем IP с увеличенной продолжительностью, так как это явно бот
+    // Логируем запрос перед блокировкой
     if ($this->useRedis && $this->redis) {
+        $this->logRequestRedis(); // Добавили логирование
         $this->blockIPRedis(BLOCK_TIME_THIRD, 'Обнаружен доступ к Honeypot URL');
     } else {
         $this->connectDB();
+        $this->initializeTables(); // Убедимся, что таблицы созданы
+        $this->logRequest(); // Добавили логирование
         $this->blockIP(BLOCK_TIME_THIRD, 'Обнаружен доступ к Honeypot URL');
     }
     // Добавляем в список жестких блокировок
@@ -715,21 +728,31 @@ if ($this->checkHoneypotUrl()) {
 	// Проверка согласованности UA
 if ($this->checkUAConsistency()) {
     if ($this->useRedis && $this->redis) {
+        // Добавляем логирование
+        $this->logRequestRedis();
         $this->blockIPRedis(BLOCK_TIME_SECOND, 'Использование множества разных User-Agent');
     } else {
         $this->connectDB();
+        // Добавляем логирование
+        $this->initializeTables();
+        $this->logRequest();
         $this->blockIP(BLOCK_TIME_SECOND, 'Использование множества разных User-Agent');
     }
     $this->redirectToUnlockPage();
     exit;
 }
 
-		// НОВЫЙ КОД: Проверка на подозрительные шаблоны таймирования
+// НОВЫЙ КОД: Проверка на подозрительные шаблоны таймирования
 if (method_exists($this, 'checkTimingDispersion') && $this->checkTimingDispersion()) {
     if ($this->useRedis && $this->redis) {
+        // Добавляем логирование
+        $this->logRequestRedis();
         $this->blockIPRedis(BLOCK_TIME_SECOND, 'Подозрительный шаблон таймирования запросов');
     } else {
         $this->connectDB();
+        // Добавляем логирование
+        $this->initializeTables();
+        $this->logRequest();
         $this->blockIP(BLOCK_TIME_SECOND, 'Подозрительный шаблон таймирования запросов');
     }
     $this->redirectToUnlockPage();
@@ -741,10 +764,18 @@ if (method_exists($this, 'checkTimingDispersion') && $this->checkTimingDispersio
         // Проверка безопасности Cookie
         if (method_exists($this, 'checkCookieSecurity') && $this->checkCookieSecurity()) {
             // Если обнаружены проблемы с Cookie и блокировка включена
-            if (!defined('DISABLE_COOKIE_SECURITY_BLOCKING') || !DISABLE_COOKIE_SECURITY_BLOCKING) {
-                $this->blockIPForCookieIssue();
-                // После blockIPForCookieIssue() происходит exit
-            }
+if (!defined('DISABLE_COOKIE_SECURITY_BLOCKING') || !DISABLE_COOKIE_SECURITY_BLOCKING) {
+    // Добавляем логирование перед вызовом blockIPForCookieIssue
+    if ($this->useRedis && $this->redis) {
+        $this->logRequestRedis();
+    } else {
+        $this->connectDB();
+        $this->initializeTables();
+        $this->logRequest();
+    }
+    $this->blockIPForCookieIssue();
+    // После blockIPForCookieIssue() происходит exit
+}
         }
     }	
 	
@@ -757,17 +788,22 @@ if (method_exists($this, 'checkTimingDispersion') && $this->checkTimingDispersio
             error_log("Throttling applied for IP {$this->ip}: delay {$throttleResult['delay']}ms, remaining {$throttleResult['remaining']} requests");
             
             // Если наступил жесткий лимит, блокируем IP
-            if ($throttleResult['remaining'] <= -10 && defined('THROTTLING_BLOCK_ON_HARD_LIMIT') && THROTTLING_BLOCK_ON_HARD_LIMIT) {
-                // Блокируем через Redis или базу данных в зависимости от настроек
-                if ($this->useRedis && $this->redis) {
-                    $this->blockIPRedis(BLOCK_TIME_FIRST, 'Превышен жесткий лимит запросов (троттлинг)');
-                } else {
-                    $this->connectDB();
-                    $this->blockIP(BLOCK_TIME_FIRST, 'Превышен жесткий лимит запросов (троттлинг)');
-                }
-                $this->redirectToUnlockPage();
-                exit;
-            }
+if ($throttleResult['remaining'] <= -10 && defined('THROTTLING_BLOCK_ON_HARD_LIMIT') && THROTTLING_BLOCK_ON_HARD_LIMIT) {
+    // Блокируем через Redis или базу данных в зависимости от настроек
+    if ($this->useRedis && $this->redis) {
+        // Добавляем логирование
+        $this->logRequestRedis();
+        $this->blockIPRedis(BLOCK_TIME_FIRST, 'Превышен жесткий лимит запросов (троттлинг)');
+    } else {
+        $this->connectDB();
+        // Добавляем логирование
+        $this->initializeTables();
+        $this->logRequest();
+        $this->blockIP(BLOCK_TIME_FIRST, 'Превышен жесткий лимит запросов (троттлинг)');
+    }
+    $this->redirectToUnlockPage();
+    exit;
+}
         }
     }
     
@@ -811,20 +847,22 @@ if (file_exists($this->dos_dir . 'block_escalation.php')) {
     // Если Redis используется и доступен - используем его
     if ($this->useRedis && $this->redis) {
         // Проверяем и обновляем частоту запросов IP через Redis
-        if ($this->checkIPRateLimitRedis()) {
-            $this->logRequestRedis();
-            $this->blockIPRedis(BLOCK_TIME_FIRST, 'Превышен лимит запросов (защита от подмены сессии)');
-            $this->redirectToUnlockPage();
-            exit;
-        }
+if ($this->checkIPRateLimitRedis()) {
+    // Добавляем логирование
+    $this->logRequestRedis();
+    $this->blockIPRedis(BLOCK_TIME_FIRST, 'Превышен лимит запросов (защита от подмены сессии)');
+    $this->redirectToUnlockPage();
+    exit;
+}
         
         // Проверка на слишком частые запросы страниц
-        if ($this->checkPageRateLimitRedis()) {
-            $this->logRequestRedis();
-            $this->blockIPRedis(BLOCK_TIME_FIRST, 'Превышен лимит запросов страниц');
-            $this->redirectToUnlockPage();
-            exit;
-        }
+if ($this->checkPageRateLimitRedis()) {
+    // Добавляем логирование
+    $this->logRequestRedis();
+    $this->blockIPRedis(BLOCK_TIME_FIRST, 'Превышен лимит запросов страниц в секунду');
+    $this->redirectToUnlockPage();
+    exit;
+}
         
 // Вызываем метод и сохраняем его результат в переменную
 $is_suspicious = $this->isRequestSuspicious();
@@ -849,23 +887,25 @@ if ($is_suspicious === true) {
         // Если БД доступна, используем её
         if ($db_available) {
             // Проверка через БД, независимая от сессии
-            if ($this->checkIPRateLimitInDatabase()) {
-                $this->logRequest();
-                $this->blockIP(3600, 'Превышен лимит запросов (защита от подмены сессии)');
-                
-                $this->redirectToUnlockPage();
-                exit;
-            }
+if ($this->checkIPRateLimitInDatabase()) {
+    // Добавляем логирование
+    $this->logRequest();
+    $this->blockIP(3600, 'Превышен лимит запросов (защита от подмены сессии)');
+    
+    $this->redirectToUnlockPage();
+    exit;
+}
             
             // Проверка на слишком частые запросы страниц
-            if ($this->checkPageRateLimit()) {
-                // Если лимит превышен, блокируем IP
-                $this->logRequest();
-                $this->blockIP(3600, 'Превышен лимит запросов страниц (>3 в секунду)');
-                
-                $this->redirectToUnlockPage();
-                exit;
-            }
+if ($this->checkPageRateLimit()) {
+    // Если лимит превышен, блокируем IP
+    // Добавляем логирование
+    $this->logRequest();
+    $this->blockIP(3600, 'Превышен лимит запросов страниц (>3 в секунду)');
+    
+    $this->redirectToUnlockPage();
+    exit;
+}
             
 // Вызываем метод и сохраняем его результат в переменную
 $is_suspicious = $this->isRequestSuspicious();
@@ -1979,9 +2019,12 @@ private function isRequestSuspicious() {
         error_log("Блокировка IP {$this->ip} с {$reason}");
         
         if ($this->useRedis && $this->redis) {
+			$this->logRequestRedis();
             $this->blockIPRedis(BLOCK_TIME_THIRD, $reason);
         } else {
             $this->connectDB();
+			$this->initializeTables(); // Убеждаемся, что таблицы созданы
+			$this->logRequest(); // Добавляем логирование
             $this->blockIP(BLOCK_TIME_THIRD, $reason);
         }
         $this->redirectToUnlockPage();
@@ -1998,9 +2041,12 @@ private function isRequestSuspicious() {
             error_log("Блокировка IP {$this->ip} с {$reason}: {$ua}");
             
             if ($this->useRedis && $this->redis) {
+				$this->logRequestRedis();
                 $this->blockIPRedis(BLOCK_TIME_THIRD, $reason);
             } else {
                 $this->connectDB();
+				$this->initializeTables(); // Убеждаемся, что таблицы созданы
+				$this->logRequest(); // Добавляем логирование
                 $this->blockIP(BLOCK_TIME_THIRD, $reason);
             }
             
