@@ -1180,6 +1180,142 @@ if ($is_suspicious === true) {
         
         return false;
     }
+	
+
+/**
+ * Добавление IP-адреса в белый список
+ * 
+ * @param string $ip IP-адрес для добавления
+ * @param string $reason Причина добавления (необязательно)
+ * @return bool Результат операции
+ */
+private function addIPToWhitelist($ip, $reason = 'Автоматическое добавление') {
+    // Проверяем валидность IP-адреса
+    if (!$this->isValidIP($ip)) {
+        error_log("Ошибка: Попытка добавить невалидный IP {$ip} в белый список");
+        return false;
+    }
+    
+    // Проверяем, не находится ли IP уже в белом списке
+    if ($this->isIpInWhitelist($ip)) {
+        return true; // IP уже в белом списке
+    }
+    
+    // Путь к файлу белого списка
+    $whitelist_file = $this->dos_dir . 'whitelist_ips.php';
+    
+    // Загружаем текущий белый список
+    $whitelist_ips = array();
+    if (file_exists($whitelist_file)) {
+        include $whitelist_file;
+        if (isset($whitelist_ips) && is_array($whitelist_ips)) {
+            // Используем уже загруженный массив
+        }
+    }
+    
+    // Добавляем IP в белый список, если его там еще нет
+    if (!in_array($ip, $whitelist_ips)) {
+        $whitelist_ips[] = $ip;
+        
+        // Обновляем массив в памяти
+        $this->whitelisted_ips = $whitelist_ips;
+        
+        // Формируем содержимое файла
+        $content = "<?php\n// Автоматически обновлено: " . date('Y-m-d H:i:s') . "\n";
+        $content .= "// Последнее обновление: {$ip} - {$reason}\n";
+        $content .= "\$whitelist_ips = " . var_export($whitelist_ips, true) . ";\n";
+        
+        // Сохраняем файл
+        $tmp_file = $whitelist_file . '.tmp';
+        if (file_put_contents($tmp_file, $content) !== false) {
+            if (rename($tmp_file, $whitelist_file)) {
+                error_log("IP {$ip} успешно добавлен в белый список: {$reason}");
+                return true;
+            }
+        }
+        
+        // Прямая запись, если временный файл не удалось создать или переименовать
+        if (file_put_contents($whitelist_file, $content) !== false) {
+            error_log("IP {$ip} успешно добавлен в белый список (прямая запись): {$reason}");
+            return true;
+        }
+        
+        error_log("Ошибка: Не удалось добавить IP {$ip} в белый список");
+        return false;
+    }
+    
+    return true; // IP уже был в белом списке
+}
+
+/**
+ * Удаление IP-адреса из белого списка
+ * 
+ * @param string $ip IP-адрес для удаления
+ * @return bool Результат операции
+ */
+private function removeIPFromWhitelist($ip) {
+    // Проверяем валидность IP-адреса
+    if (!$this->isValidIP($ip)) {
+        error_log("Ошибка: Попытка удалить невалидный IP {$ip} из белого списка");
+        return false;
+    }
+    
+    // Проверяем, находится ли IP в белом списке
+    if (!$this->isIpInWhitelist($ip)) {
+        return true; // IP и так нет в белом списке
+    }
+    
+    // Путь к файлу белого списка
+    $whitelist_file = $this->dos_dir . 'whitelist_ips.php';
+    
+    // Загружаем текущий белый список
+    $whitelist_ips = array();
+    if (file_exists($whitelist_file)) {
+        include $whitelist_file;
+        if (isset($whitelist_ips) && is_array($whitelist_ips)) {
+            // Используем уже загруженный массив
+        }
+    }
+    
+    // Удаляем IP из белого списка
+    $new_whitelist = array();
+    foreach ($whitelist_ips as $white_ip) {
+        if ($this->normalizeIP($white_ip) !== $this->normalizeIP($ip)) {
+            $new_whitelist[] = $white_ip;
+        }
+    }
+    
+    // Если IP был найден и удален
+    if (count($new_whitelist) < count($whitelist_ips)) {
+        // Обновляем массив в памяти
+        $this->whitelisted_ips = $new_whitelist;
+        
+        // Формируем содержимое файла
+        $content = "<?php\n// Автоматически обновлено: " . date('Y-m-d H:i:s') . "\n";
+        $content .= "// Последнее обновление: удален {$ip}\n";
+        $content .= "\$whitelist_ips = " . var_export($new_whitelist, true) . ";\n";
+        
+        // Сохраняем файл
+        $tmp_file = $whitelist_file . '.tmp';
+        if (file_put_contents($tmp_file, $content) !== false) {
+            if (rename($tmp_file, $whitelist_file)) {
+                error_log("IP {$ip} успешно удален из белого списка");
+                return true;
+            }
+        }
+        
+        // Прямая запись, если временный файл не удалось создать или переименовать
+        if (file_put_contents($whitelist_file, $content) !== false) {
+            error_log("IP {$ip} успешно удален из белого списка (прямая запись)");
+            return true;
+        }
+        
+        error_log("Ошибка: Не удалось удалить IP {$ip} из белого списка");
+        return false;
+    }
+    
+    return true; // IP не был найден в белом списке
+}
     
     /**
      * Нормализация IP-адреса (для IPv6 приводим к полному формату)
@@ -1395,25 +1531,135 @@ private function blockIPForCookieIssue() {
     
 /**
  * Проверка легитимности поисковых ботов с поддержкой PHP 5.6-8.3
+ * Поддерживает массив разрешенных ботов из settings.php
  * 
  * @param string $ip IP-адрес для проверки
  * @param string $user_agent User-Agent строка
  * @return bool Результат проверки
  */
 private function verifySearchBot($ip, $user_agent) {
-    // Быстрая проверка User-Agent
-    $ua = strtolower($user_agent);
-    $is_google = strpos($ua, 'googlebot') !== false;
-    $is_yandex = strpos($ua, 'yandexbot') !== false;
-    $is_bing = strpos($ua, 'bingbot') !== false;
+    // Проверяем, что массив разрешенных ботов определен глобально
+    global $ALLOWED_SEARCH_BOTS;
     
-    // Если не похож на поисковый бот, сразу возвращаем false
-    if (!$is_google && !$is_yandex && !$is_bing) {
+    // Если массив не определен, используем старую логику
+    if (!isset($ALLOWED_SEARCH_BOTS) || !is_array($ALLOWED_SEARCH_BOTS)) {
+        // Возвращаемся к старой реализации проверки
+        $ua = strtolower($user_agent);
+        $is_google = strpos($ua, 'googlebot') !== false;
+        $is_yandex = strpos($ua, 'yandexbot') !== false;
+        $is_bing = strpos($ua, 'bingbot') !== false;
+        
+        // Если не похож на поисковый бот, сразу возвращаем false
+        if (!$is_google && !$is_yandex && !$is_bing) {
+            return false;
+        }
+        
+        // Проверяем отключена ли DNS проверка полностью
+        if (defined('DISABLE_BOT_DNS_CHECK') && DISABLE_BOT_DNS_CHECK) {
+            return true; // Доверяем User-Agent без DNS проверки
+        }
+        
+        // Проверяем кэш, чтобы не делать DNS-запрос каждый раз
+        $cache_key = 'verified_bot_' . md5($ip);
+        
+        // Если используем Redis и он доступен
+        if ($this->useRedis && $this->redis) {
+            try {
+                // Пробуем получить результат из кэша
+                $cached = $this->redis->get($cache_key);
+                if ($cached !== false) {
+                    return (bool)$cached;
+                }
+            } catch (Exception $e) {
+                error_log("Redis error in bot verification: " . $e->getMessage());
+            }
+        }
+        
+        // Проверяем, доступна ли функция gethostbyaddr
+        if (!function_exists('gethostbyaddr') || 
+            in_array('gethostbyaddr', array_map('trim', explode(',', ini_get('disable_functions'))))) {
+            return true; // При невозможности проверки считаем ботом по User-Agent
+        }
+        
+        // Сохраняем оригинальный таймаут
+        $original_timeout = ini_get('default_socket_timeout');
+        
+        // Устанавливаем таймаут для DNS-запроса, если это возможно
+        if (function_exists('ini_set')) {
+            @ini_set('default_socket_timeout', 2); // 2-секундный таймаут
+        }
+        
+        $verified = false;
+        $host = $ip; // По умолчанию - тот же IP
+        
+        // Безопасный DNS-запрос с подавлением ошибок
+        try {
+            $host = @gethostbyaddr($ip);
+            
+            // Если DNS-запрос успешен и вернул имя хоста (не IP)
+            if ($host && $host !== $ip) {
+                if ($is_google && preg_match('/\.googlebot\.com$/i', $host)) {
+                    $verified = true;
+                } elseif ($is_yandex && preg_match('/\.yandex\.(ru|com|net)$/i', $host)) {
+                    $verified = true;
+                } elseif ($is_bing && preg_match('/\.msn\.com$/i', $host)) {
+                    $verified = true;
+                }
+            }
+        } catch (Exception $e) {
+            error_log("DNS lookup error for bot verification: " . $e->getMessage());
+        }
+        
+        // Восстанавливаем оригинальный таймаут
+        if (function_exists('ini_set')) {
+            @ini_set('default_socket_timeout', $original_timeout);
+        }
+        
+        // Сохраняем результат в кэш
+        $cache_ttl = defined('BOT_VERIFICATION_CACHE_TTL') ? BOT_VERIFICATION_CACHE_TTL : 43200;
+        if ($this->useRedis && $this->redis) {
+            try {
+                $this->redis->setex($cache_key, $cache_ttl, (int)$verified);
+            } catch (Exception $e) {
+                error_log("Redis caching error: " . $e->getMessage());
+            }
+        }
+        
+        return $verified;
+    }
+    
+    // НОВЫЙ КОД: проверка по массиву разрешенных ботов
+    $ua = strtolower($user_agent);
+    $detected_bot = null;
+    
+    // Проходим по всем определенным ботам
+    foreach ($ALLOWED_SEARCH_BOTS as $bot_name => $bot_data) {
+        if (!isset($bot_data['user_agents']) || !is_array($bot_data['user_agents'])) {
+            continue;
+        }
+        
+        // Проверяем все возможные User-Agent для данного бота
+        foreach ($bot_data['user_agents'] as $bot_ua) {
+            if (strpos($ua, strtolower($bot_ua)) !== false) {
+                $detected_bot = $bot_name;
+                break 2; // Выход из обоих циклов
+            }
+        }
+    }
+    
+    // Если бот не обнаружен по User-Agent, возвращаем false
+    if ($detected_bot === null) {
         return false;
     }
     
     // Проверяем отключена ли DNS проверка полностью
     if (defined('DISABLE_BOT_DNS_CHECK') && DISABLE_BOT_DNS_CHECK) {
+        // Если нужно автоматическое добавление в белый список
+        if (isset($ALLOWED_SEARCH_BOTS[$detected_bot]['auto_whitelist']) && 
+            $ALLOWED_SEARCH_BOTS[$detected_bot]['auto_whitelist']) {
+            $this->addIPToWhitelist($ip, "Подтвержденный бот: " . $detected_bot);
+        }
+        
         return true; // Доверяем User-Agent без DNS проверки
     }
     
@@ -1426,7 +1672,15 @@ private function verifySearchBot($ip, $user_agent) {
             // Пробуем получить результат из кэша
             $cached = $this->redis->get($cache_key);
             if ($cached !== false) {
-                return (bool)$cached;
+                $is_verified = (bool)$cached;
+                
+                // Если бот верифицирован и нужно автоматическое добавление в белый список
+                if ($is_verified && isset($ALLOWED_SEARCH_BOTS[$detected_bot]['auto_whitelist']) && 
+                    $ALLOWED_SEARCH_BOTS[$detected_bot]['auto_whitelist']) {
+                    $this->addIPToWhitelist($ip, "Подтвержденный бот: " . $detected_bot);
+                }
+                
+                return $is_verified;
             }
         } catch (Exception $e) {
             error_log("Redis error in bot verification: " . $e->getMessage());
@@ -1450,18 +1704,27 @@ private function verifySearchBot($ip, $user_agent) {
     $verified = false;
     $host = $ip; // По умолчанию - тот же IP
     
+    // Получаем список доменов для обнаруженного бота
+    $bot_domains = isset($ALLOWED_SEARCH_BOTS[$detected_bot]['domains']) ? 
+                   $ALLOWED_SEARCH_BOTS[$detected_bot]['domains'] : array();
+    
+    // Если домены не определены, возвращаем false
+    if (empty($bot_domains)) {
+        return false;
+    }
+    
     // Безопасный DNS-запрос с подавлением ошибок
     try {
         $host = @gethostbyaddr($ip);
         
         // Если DNS-запрос успешен и вернул имя хоста (не IP)
         if ($host && $host !== $ip) {
-            if ($is_google && preg_match('/\.googlebot\.com$/i', $host)) {
-                $verified = true;
-            } elseif ($is_yandex && preg_match('/\.yandex\.(ru|com|net)$/i', $host)) {
-                $verified = true;
-            } elseif ($is_bing && preg_match('/\.msn\.com$/i', $host)) {
-                $verified = true;
+            // Проверяем домен по списку разрешенных для данного бота
+            foreach ($bot_domains as $domain) {
+                if (preg_match('/' . preg_quote($domain, '/') . '$/i', $host)) {
+                    $verified = true;
+                    break;
+                }
             }
         }
     } catch (Exception $e) {
@@ -1471,6 +1734,17 @@ private function verifySearchBot($ip, $user_agent) {
     // Восстанавливаем оригинальный таймаут
     if (function_exists('ini_set')) {
         @ini_set('default_socket_timeout', $original_timeout);
+    }
+    
+    // Если бот подтвержден и нужно автоматически добавить его в белый список
+    if ($verified && isset($ALLOWED_SEARCH_BOTS[$detected_bot]['auto_whitelist']) && 
+        $ALLOWED_SEARCH_BOTS[$detected_bot]['auto_whitelist']) {
+        $this->addIPToWhitelist($ip, "Подтвержденный бот: " . $detected_bot);
+    }
+    
+    // Логируем информацию о подтвержденном боте, если включено
+    if ($verified && defined('LOG_SEARCH_BOT_ACTIVITY') && LOG_SEARCH_BOT_ACTIVITY) {
+        error_log("Подтвержден поисковый бот {$detected_bot}: {$ip} ({$host}) - {$user_agent}");
     }
     
     // Сохраняем результат в кэш
