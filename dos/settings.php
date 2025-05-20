@@ -187,4 +187,44 @@ define('UA_CHECK_WINDOW', 3600);                // Временное окно �
 // Настройки для обнаружения 404-атак
 define('MAX_404_ERRORS', 20);            // Максимальное количество 404 ошибок за период
 define('ERROR_404_WINDOW', 600);         // Период отслеживания 404 ошибок (секунды)
+
+// Список разрешенных поисковых ботов (добавлен новый массив)
+$ALLOWED_SEARCH_BOTS = array(
+    'google' => array(
+        'user_agents' => array('Googlebot', 'AdsBot-Google', 'Google-AdWords', 'Google Favicon', 'Mediapartners-Google'),
+        'domains' => array('.googlebot.com', '.google.com'),
+        'auto_whitelist' => true  // Автоматически добавлять в белый список при проверке
+    ),
+    'yandex' => array(
+        'user_agents' => array('YandexBot', 'YandexImages', 'YandexMetrika', 'YandexDirect'),
+        'domains' => array('.yandex.ru', '.yandex.com', '.yandex.net'),
+        'auto_whitelist' => true
+    ),
+    'bing' => array(
+        'user_agents' => array('bingbot', 'BingPreview', 'msnbot'),
+        'domains' => array('.msn.com', '.bing.com', '.msedge.net'),
+        'auto_whitelist' => true
+    ),
+    'baidu' => array(
+        'user_agents' => array('Baiduspider'),
+        'domains' => array('.baidu.com', '.baidu.jp'),
+        'auto_whitelist' => false
+    ),
+    'duckduckgo' => array(
+        'user_agents' => array('DuckDuckBot', 'DuckDuckGo-Favicons-Bot'),
+        'domains' => array('.duckduckgo.com'),
+        'auto_whitelist' => false
+    ),
+    'mail.ru' => array(
+        'user_agents' => array('Mail.RU_Bot'),
+        'domains' => array('.mail.ru', '.mail.ru'),
+        'auto_whitelist' => false
+    ),
+	'apple' => array(
+    'user_agents' => array('Applebot', 'AppleNewsBot'),
+    'domains' => array('.applebot.apple.com'),
+    'auto_whitelist' => true  // Установите true, если хотите автоматически добавлять в белый список
+	),
+    // Добавьте других ботов по необходимости
+);
 ?>
