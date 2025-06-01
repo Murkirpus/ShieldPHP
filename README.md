@@ -129,6 +129,7 @@ If you have questions or suggestions for improving the counter, please contact u
 - GitHub: [https://github.com/Murkirpus/ShieldPHP](https://github.com/Murkirpus/ShieldPHP)
 https://murkir.pp.ua
 https://dj-x.info
+It works on this site https://kinoprostor.tv/
 
 ## Author
 
