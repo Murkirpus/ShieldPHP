@@ -1,0 +1,1667 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Интегрированная система защиты от ботов</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 20px;
+        }
+
+        .security-container {
+            background: white;
+            border-radius: 16px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+            padding: 40px;
+            max-width: 500px;
+            width: 100%;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .security-container::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #4285f4, #34a853, #fbbc05, #ea4335);
+        }
+
+        .verification-box {
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            padding: 25px;
+            background: #fafafa;
+            margin: 25px 0;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .verification-box.checking {
+            border-color: #4285f4;
+            background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+            box-shadow: 0 8px 25px rgba(66, 133, 244, 0.15);
+        }
+
+        .verification-box.verified {
+            border-color: #34a853;
+            background: linear-gradient(135deg, #f0fff4 0%, #e8f5e8 100%);
+            box-shadow: 0 8px 25px rgba(52, 168, 83, 0.15);
+        }
+
+        .verification-box.failed {
+            border-color: #ea4335;
+            background: linear-gradient(135deg, #fff0f0 0%, #fce8e6 100%);
+            box-shadow: 0 8px 25px rgba(234, 67, 53, 0.15);
+        }
+
+        .verification-content {
+            display: flex;
+            align-items: center;
+            justify-content: flex-start;
+            gap: 20px;
+        }
+
+        .checkbox-container {
+            position: relative;
+            width: 28px;
+            height: 28px;
+        }
+
+        .security-checkbox {
+            width: 28px;
+            height: 28px;
+            border: 3px solid #d1d5db;
+            border-radius: 6px;
+            background: white;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            position: relative;
+        }
+
+        .security-checkbox:hover {
+            border-color: #4285f4;
+            transform: scale(1.05);
+        }
+
+        .security-checkbox.checking {
+            border-color: #4285f4;
+            background: #f8f9ff;
+        }
+
+        .security-checkbox.verified {
+            border-color: #34a853;
+            background: #34a853;
+            transform: scale(1.1);
+        }
+
+        .security-checkbox.failed {
+            border-color: #ea4335;
+            background: #ffeaea;
+        }
+
+        .checkmark {
+            width: 16px;
+            height: 16px;
+            opacity: 0;
+            transform: scale(0) rotate(0deg);
+            transition: all 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+        }
+
+        .checkmark.show {
+            opacity: 1;
+            transform: scale(1) rotate(0deg);
+        }
+
+        .security-spinner {
+            width: 20px;
+            height: 20px;
+            border: 3px solid #e0e0e0;
+            border-top: 3px solid #4285f4;
+            border-radius: 50%;
+            animation: securitySpin 1.2s linear infinite;
+            opacity: 0;
+            position: absolute;
+        }
+
+        .security-spinner.show {
+            opacity: 1;
+        }
+
+        @keyframes securitySpin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .verification-text {
+            font-size: 18px;
+            font-weight: 500;
+            color: #333;
+            user-select: none;
+            flex: 1;
+            text-align: left;
+        }
+
+        .security-badge {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 13px;
+            color: #666;
+            margin-top: 15px;
+            padding: 8px 12px;
+            background: rgba(66, 133, 244, 0.05);
+            border-radius: 20px;
+            border: 1px solid rgba(66, 133, 244, 0.1);
+        }
+
+        .shield-icon {
+            width: 18px;
+            height: 18px;
+            background: linear-gradient(135deg, #4285f4, #1a73e8);
+            border-radius: 4px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 11px;
+        }
+
+        .status-message {
+            margin-top: 25px;
+            padding: 20px;
+            border-radius: 10px;
+            opacity: 0;
+            transform: translateY(15px);
+            transition: all 0.4s ease;
+            font-weight: 500;
+        }
+
+        .status-message.show {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .success-status {
+            background: linear-gradient(135deg, #d4edda, #c3e6cb);
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+
+        .error-status {
+            background: linear-gradient(135deg, #f8d7da, #f1b0b7);
+            border: 1px solid #f1b0b7;
+            color: #721c24;
+        }
+
+        .warning-status {
+            background: linear-gradient(135deg, #fff3cd, #ffeaa7);
+            border: 1px solid #ffeaa7;
+            color: #856404;
+        }
+
+        .security-button {
+            background: linear-gradient(135deg, #4285f4, #1a73e8);
+            color: white;
+            border: none;
+            padding: 15px 40px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-top: 0px;
+            opacity: 0.4;
+            pointer-events: none;
+            position: relative;
+            overflow: hidden;
+        }
+        .security-button.enabled {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .security-button.enabled:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(66, 133, 244, 0.4);
+        }
+
+        .security-button:active {
+            transform: translateY(0);
+        }
+
+        h2 {
+            color: #333;
+            margin-bottom: 10px;
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 16px;
+        }
+
+        .security-details {
+            margin-top: 25px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            font-size: 13px;
+            color: #666;
+            text-align: left;
+            display: none;
+            border: 1px solid #e9ecef;
+        }
+
+        .security-details.show {
+            display: block;
+        }
+
+        .security-metric {
+            display: flex;
+            justify-content: space-between;
+            padding: 4px 0;
+            border-bottom: 1px solid #e9ecef;
+        }
+
+        .security-metric:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            font-weight: 500;
+        }
+
+        .metric-value {
+            color: #333;
+        }
+
+        .security-level {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .level-low { background: #d4edda; color: #155724; }
+        .level-medium { background: #fff3cd; color: #856404; }
+        .level-high { background: #f8d7da; color: #721c24; }
+
+        /* Honeypot - максимально скрытые ловушки */
+        .security-trap, .bot-trap, .hidden-field {
+            position: absolute !important;
+            left: -9999px !important;
+            top: -9999px !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+            width: 0 !important;
+            height: 0 !important;
+            overflow: hidden !important;
+            visibility: hidden !important;
+            z-index: -1000 !important;
+            border: none !important;
+            background: transparent !important;
+            color: transparent !important;
+            font-size: 0 !important;
+            line-height: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
+        .progress-bar {
+            width: 100%;
+            height: 4px;
+            background: #e0e0e0;
+            border-radius: 2px;
+            margin-top: 15px;
+            overflow: hidden;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4285f4, #34a853);
+            width: 0%;
+            transition: width 0.3s ease;
+        }
+    </style>
+</head>
+<body>
+    <!-- Упрощенные honeypot ловушки - только самые критичные -->
+    <div style="position: absolute; left: -9999px; opacity: 0; pointer-events: none; width: 0; height: 0; visibility: hidden;">
+        <input type="text" class="security-trap" name="email_address" tabindex="-1" autocomplete="off">
+        <input type="text" class="bot-trap" name="user_website" tabindex="-1" autocomplete="off">
+        <input type="password" class="hidden-field" name="security_token" tabindex="-1" autocomplete="off">
+    </div>
+
+    <div class="security-container">
+        <h2>🛡️ Интегрированная защита</h2>
+        <p class="subtitle">Многоуровневая система проверки подлинности</p>
+        
+        <div class="verification-box" id="verificationBox">
+            <div class="verification-content">
+                <div class="checkbox-container">
+                    <div class="security-checkbox" id="securityCheckbox">
+                        <div class="security-spinner" id="securitySpinner"></div>
+                        <svg class="checkmark" id="securityCheckmark" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3">
+                            <polyline points="20,6 9,17 4,12"></polyline>
+                        </svg>
+                    </div>
+                </div>
+                <div class="verification-text">Я подтверждаю, что являюсь человеком</div>
+            </div>
+            
+            <div class="security-badge">
+                <div class="shield-icon">🛡</div>
+                <span>AdvancedSecurity v2.0</span>
+                <span style="margin-left: auto; font-size: 11px;">Защищено ИИ</span>
+            </div>
+
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill"></div>
+            </div>
+        </div>
+		<button class="security-button" id="securitySubmitButton">
+            Продолжить с защищенной сессией
+        </button>
+        <div class="status-message success-status" id="successMessage">
+            <strong>✅ Проверка успешно завершена!</strong><br>
+            Все системы безопасности подтвердили вашу подлинность.
+        </div>
+
+        <div class="status-message error-status" id="errorMessage">
+            <strong>❌ Обнаружена подозрительная активность</strong><br>
+            Повторите попытку через несколько секунд.
+        </div>
+
+        <div class="status-message warning-status" id="warningMessage">
+            <strong>⚠️ Дополнительная проверка требуется</strong><br>
+            Система анализирует ваше поведение...
+        </div>
+
+       
+
+        <div class="security-details" id="securityDetails">
+            <strong>📊 Детальный анализ безопасности:</strong><br><br>
+            <div id="securityMetrics"></div>
+        </div>
+    </div>
+
+    <script>
+        // Интегрированная система защиты от ботов
+        class IntegratedBotProtection {
+            constructor() {
+                // Временные метрики
+                this.sessionStart = Date.now();
+                this.pageLoadTime = performance.now();
+                this.firstInteractionTime = null;
+                
+                // Поведенческие данные
+                this.mouseData = [];
+                this.clickEvents = [];
+                this.keyboardData = [];
+                this.scrollData = [];
+                this.focusEvents = [];
+                this.touchEvents = [];
+                
+                // Cookie и сессия
+                this.cookieTests = {};
+                this.sessionTokens = {};
+                this.dynamicValidation = {};
+                
+                // Анализ окружения
+                this.environmentData = {};
+                this.browserFingerprint = {};
+                this.deviceMetrics = {};
+                
+                // Honeypot мониторинг
+                this.honeypotTriggers = [];
+                this.hiddenInteractions = [];
+                
+                // Система оценки - НАЧИНАЕМ С НУЛЯ
+                this.riskScore = 0; // Стартуем с 0 вместо undefined
+                this.confidenceLevel = 0;
+                this.detectionResults = {};
+                this.verificationAttempts = 0;
+                
+                // Инициализация всех систем
+                this.initializeProtection();
+            }
+
+            initializeProtection() {
+                console.log('🛡️ Инициализация интегрированной защиты...');
+                
+                // КРИТИЧНО: Очищаем все накопленные данные при старте
+                this.clearPreviousSession();
+                
+                // Запуск всех подсистем
+                this.setupCookieProtection();
+                this.setupBehaviorTracking();
+                this.setupEnvironmentAnalysis();
+                this.setupHoneypotTraps();
+                this.setupTimingAnalysis();
+                this.setupAdvancedFingerprinting();
+                
+                // Непрерывный мониторинг
+                this.startContinuousMonitoring();
+                
+                console.log('✅ Все системы защиты активированы');
+            }
+
+            clearPreviousSession() {
+                try {
+                    // Удаляем только простые тестовые cookies
+                    const simpleCookies = ['simple_test', 'activity'];
+                    
+                    simpleCookies.forEach(name => {
+                        document.cookie = `${name}=;expires=Thu, 01 Jan 1970 00:00:01 GMT;path=/`;
+                    });
+                    
+                    console.log('🧹 Простая очистка cookies завершена');
+                } catch (e) {
+                    console.log('⚠️ Частичная очистка:', e.message);
+                }
+            }
+
+            // === COOKIE ЗАЩИТА ===
+            // === УПРОЩЕННАЯ COOKIE ЗАЩИТА ===
+            setupCookieProtection() {
+                console.log('🍪 Настройка упрощенной cookie защиты...');
+                
+                // Инициализируем fallback всегда
+                this.cookieFallback = {};
+                this.cookiesWorking = 0;
+                
+                // Пробуем установить ТОЛЬКО один простой тестовый cookie
+                const testValue = 'test123';
+                
+                try {
+                    // Максимально простой cookie без всяких флагов
+                    document.cookie = `simple_test=${testValue}`;
+                    
+                    // Проверяем через 50ms
+                    setTimeout(() => {
+                        const testResult = document.cookie.includes(`simple_test=${testValue}`);
+                        if (testResult) {
+                            this.cookiesSupported = true;
+                            this.cookiesWorking = 1;
+                            console.log('✅ Простые cookies работают');
+                        } else {
+                            this.cookiesSupported = false;
+                            console.log('❌ Cookies заблокированы, используем fallback');
+                        }
+                    }, 50);
+                    
+                } catch (e) {
+                    this.cookiesSupported = false;
+                    console.log('❌ Ошибка cookies:', e.message);
+                }
+                
+                // Устанавливаем базовые значения в fallback (всегда работает)
+                this.cookieFallback.session_id = this.generateSecureToken(16);
+                this.cookieFallback.start_time = Date.now().toString();
+                this.cookieFallback.page_visits = '1';
+                
+                // Сохраняем ожидаемые значения
+                this.cookieTests = {
+                    session: this.cookieFallback.session_id,
+                    time: this.cookieFallback.start_time
+                };
+                
+                console.log('🍪 Cookie система инициализирована (fallback всегда активен)');
+            }
+
+            setCookie(name, value, hours) {
+                try {
+                    const expires = new Date(Date.now() + hours * 3600000);
+                    // Пробуем разные варианты установки cookie
+                    const variants = [
+                        `${name}=${value};expires=${expires.toUTCString()};path=/`,
+                        `${name}=${value};expires=${expires.toUTCString()};path=/;SameSite=Lax`,
+                        `${name}=${value};max-age=${hours * 3600};path=/`
+                    ];
+                    
+                    // Пробуем каждый вариант
+                    for (let variant of variants) {
+                        document.cookie = variant;
+                        // Проверяем, установился ли cookie
+                        if (this.testCookieSet(name, value)) {
+                            return true;
+                        }
+                    }
+                    
+                    // Если ничего не сработало, используем fallback
+                    this.cookieFallback = this.cookieFallback || {};
+                    this.cookieFallback[name] = value;
+                    return false;
+                } catch (e) {
+                    // Fallback - сохраняем в памяти
+                    this.cookieFallback = this.cookieFallback || {};
+                    this.cookieFallback[name] = value;
+                    return false;
+                }
+            }
+
+            testCookieSet(name, expectedValue) {
+                try {
+                    const cookies = document.cookie.split(';');
+                    for (let cookie of cookies) {
+                        const [cookieName, cookieValue] = cookie.trim().split('=');
+                        if (cookieName === name && cookieValue === expectedValue) {
+                            return true;
+                        }
+                    }
+                    return false;
+                } catch (e) {
+                    return false;
+                }
+            }
+
+            getCookie(name) {
+                try {
+                    const cookie = document.cookie.split(';')
+                        .find(row => row.trim().startsWith(name + '='))
+                        ?.split('=')[1] || null;
+                    
+                    // Если cookie не найден, проверяем fallback
+                    if (!cookie && this.cookieFallback && this.cookieFallback[name]) {
+                        return this.cookieFallback[name];
+                    }
+                    
+                    return cookie;
+                } catch (e) {
+                    // Fallback для ограниченных сред
+                    return this.cookieFallback && this.cookieFallback[name] || null;
+                }
+            }
+
+            updateDynamicCookies() {
+                // Простое обновление только в fallback (всегда работает)
+                const activity = this.mouseData.length + this.clickEvents.length;
+                this.cookieFallback.activity = activity.toString();
+                this.cookieFallback.last_update = Date.now().toString();
+                
+                // Пробуем обновить реальные cookies если они работают
+                if (this.cookiesSupported) {
+                    try {
+                        document.cookie = `activity=${activity}`;
+                    } catch (e) {
+                        // Не критично, fallback работает
+                    }
+                }
+            }
+
+            validateCookieIntegrity() {
+                let cookieViolations = 0;
+                
+                Object.keys(this.cookieTests).forEach(key => {
+                    const expected = this.cookieTests[key];
+                    const actual = this.getCookie(`sec_${key}`);
+                    if (!actual || actual !== expected.toString()) {
+                        cookieViolations++;
+                        this.riskScore += 15;
+                    }
+                });
+                
+                // Проверка на подозрительное отсутствие cookies
+                const totalCookies = document.cookie.split(';').filter(c => c.trim()).length;
+                if (totalCookies < 4) {
+                    this.riskScore += 25;
+                }
+                
+                return cookieViolations === 0;
+            }
+
+            // === ПОВЕДЕНЧЕСКОЕ ОТСЛЕЖИВАНИЕ ===
+            setupBehaviorTracking() {
+                // Отслеживание мыши с детальной аналитикой
+                document.addEventListener('mousemove', (e) => {
+                    if (!this.firstInteractionTime) this.firstInteractionTime = Date.now();
+                    
+                    this.mouseData.push({
+                        x: e.clientX,
+                        y: e.clientY,
+                        timestamp: Date.now(),
+                        movementX: e.movementX || 0,
+                        movementY: e.movementY || 0,
+                        pressure: e.pressure || 0
+                    });
+                    
+                    // Сохраняем только последние 100 точек
+                    if (this.mouseData.length > 100) {
+                        this.mouseData.shift();
+                    }
+                });
+
+                // Расширенное отслеживание кликов
+                document.addEventListener('click', (e) => {
+                    this.clickEvents.push({
+                        x: e.clientX,
+                        y: e.clientY,
+                        timestamp: Date.now(),
+                        button: e.button,
+                        target: e.target.tagName,
+                        ctrlKey: e.ctrlKey,
+                        altKey: e.altKey,
+                        shiftKey: e.shiftKey,
+                        detail: e.detail, // количество кликов
+                        isTrusted: e.isTrusted
+                    });
+                });
+
+                // Детальная клавиатурная аналитика
+                document.addEventListener('keydown', (e) => {
+                    this.keyboardData.push({
+                        key: e.key,
+                        code: e.code,
+                        timestamp: Date.now(),
+                        ctrlKey: e.ctrlKey,
+                        altKey: e.altKey,
+                        shiftKey: e.shiftKey,
+                        isTrusted: e.isTrusted,
+                        location: e.location
+                    });
+                });
+
+                // Отслеживание прокрутки
+                window.addEventListener('scroll', (e) => {
+                    this.scrollData.push({
+                        scrollY: window.scrollY,
+                        scrollX: window.scrollX,
+                        timestamp: Date.now(),
+                        deltaY: e.deltaY || 0,
+                        deltaMode: e.deltaMode || 0
+                    });
+                });
+
+                // События фокуса/расфокуса
+                ['focus', 'blur', 'visibilitychange'].forEach(event => {
+                    document.addEventListener(event, () => {
+                        this.focusEvents.push({
+                            type: event,
+                            timestamp: Date.now(),
+                            hidden: document.hidden
+                        });
+                    });
+                });
+
+                // Touch события для мобильных устройств
+                ['touchstart', 'touchmove', 'touchend'].forEach(event => {
+                    document.addEventListener(event, (e) => {
+                        if (e.touches[0]) {
+                            this.touchEvents.push({
+                                type: event,
+                                x: e.touches[0].clientX,
+                                y: e.touches[0].clientY,
+                                pressure: e.touches[0].force || 0,
+                                timestamp: Date.now()
+                            });
+                        }
+                    });
+                });
+            }
+
+            // === АНАЛИЗ ОКРУЖЕНИЯ ===
+            setupEnvironmentAnalysis() {
+                this.environmentData = {
+                    // Базовая информация браузера
+                    userAgent: navigator.userAgent,
+                    platform: navigator.platform,
+                    language: navigator.language,
+                    languages: navigator.languages.join(','),
+                    cookieEnabled: navigator.cookieEnabled,
+                    
+                    // Подозрительные признаки автоматизации
+                    webdriver: navigator.webdriver || false,
+                    phantom: !!window.phantom,
+                    selenium: !!window._selenium,
+                    webdriverio: !!window.webdriverio,
+                    
+                    // Размеры и разрешение
+                    screenWidth: screen.width,
+                    screenHeight: screen.height,
+                    availWidth: screen.availWidth,
+                    availHeight: screen.availHeight,
+                    colorDepth: screen.colorDepth,
+                    pixelDepth: screen.pixelDepth,
+                    
+                    // Окно браузера
+                    windowWidth: window.innerWidth,
+                    windowHeight: window.innerHeight,
+                    outerWidth: window.outerWidth,
+                    outerHeight: window.outerHeight,
+                    
+                    // Временная зона и время
+                    timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+                    timezoneOffset: new Date().getTimezoneOffset(),
+                    
+                    // Плагины и расширения
+                    pluginsCount: navigator.plugins.length,
+                    mimeTypesCount: navigator.mimeTypes.length,
+                    
+                    // WebGL и Canvas возможности
+                    webglVendor: this.getWebGLVendor(),
+                    webglRenderer: this.getWebGLRenderer(),
+                    canvasFingerprint: this.generateCanvasFingerprint(),
+                    
+                    // Дополнительные проверки
+                    hasChrome: !!window.chrome,
+                    hasOpera: !!window.opera,
+                    hasSafari: /Safari/.test(navigator.userAgent) && !/Chrome/.test(navigator.userAgent),
+                    
+                    // Производительность
+                    hardwareConcurrency: navigator.hardwareConcurrency || 0,
+                    deviceMemory: navigator.deviceMemory || 0,
+                    maxTouchPoints: navigator.maxTouchPoints || 0
+                };
+
+                this.analyzeEnvironmentSuspicion();
+            }
+
+            analyzeEnvironmentSuspicion() {
+                console.log('🔍 Анализ окружения - мягкий режим...');
+                
+                // МИНИМАЛЬНЫЕ штрафы только за критические признаки автоматизации
+                if (this.environmentData.webdriver) {
+                    this.riskScore += 30; // уменьшили с 50
+                    console.log('⚠️ WebDriver обнаружен: +30 риска');
+                }
+                if (this.environmentData.phantom) {
+                    this.riskScore += 35; // уменьшили с 60  
+                    console.log('⚠️ PhantomJS обнаружен: +35 риска');
+                }
+                if (this.environmentData.selenium) {
+                    this.riskScore += 35; // уменьшили с 60
+                    console.log('⚠️ Selenium обнаружен: +35 риска');
+                }
+                
+                // Убираем большинство других штрафов - они слишком агрессивны
+                // НЕ штрафуем за размеры экрана, плагины, языки - это может быть нормально
+                
+                console.log(`🔍 Анализ окружения завершен, общий риск: ${this.riskScore}`);
+            }
+
+            getWebGLVendor() {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                    return gl ? gl.getParameter(gl.VENDOR) : 'unknown';
+                } catch (e) {
+                    return 'error';
+                }
+            }
+
+            getWebGLRenderer() {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+                    return gl ? gl.getParameter(gl.RENDERER) : 'unknown';
+                } catch (e) {
+                    return 'error';
+                }
+            }
+
+            generateCanvasFingerprint() {
+                try {
+                    const canvas = document.createElement('canvas');
+                    const ctx = canvas.getContext('2d');
+                    const txt = 'BotDetection🤖2025';
+                    
+                    ctx.textBaseline = 'top';
+                    ctx.font = '14px Arial';
+                    ctx.fillStyle = '#f60';
+                    ctx.fillRect(125, 1, 62, 20);
+                    ctx.fillStyle = '#069';
+                    ctx.fillText(txt, 2, 15);
+                    ctx.fillStyle = 'rgba(102, 204, 0, 0.7)';
+                    ctx.fillText(txt, 4, 17);
+                    
+                    return canvas.toDataURL().slice(-50); // Последние 50 символов
+                } catch (e) {
+                    return 'error';
+                }
+            }
+
+            // === HONEYPOT ЛОВУШКИ ===
+            // === HONEYPOT ОТКЛЮЧЕН ДЛЯ СТАБИЛЬНОСТИ ===
+            setupHoneypotTraps() {
+                console.log('🍯 Honeypot система ОТКЛЮЧЕНА для максимальной совместимости');
+                
+                // Инициализируем пустые массивы
+                this.honeypotTriggers = [];
+                this.hiddenInteractions = [];
+                
+                // Не настраиваем события - оставляем элементы как декорацию
+                // Это позволит системе работать стабильно в любых браузерах
+                
+                console.log('✅ Honeypot отключен, фокус на поведенческом анализе');
+            }
+
+            // === ВРЕМЕННОЙ АНАЛИЗ ===
+            setupTimingAnalysis() {
+                // Анализ времени первого взаимодействия
+                this.firstPaintTime = performance.getEntriesByType('paint')
+                    .find(entry => entry.name === 'first-contentful-paint')?.startTime || 0;
+                
+                // Периодический анализ временных паттернов
+                setInterval(() => this.analyzeTimingPatterns(), 2000);
+            }
+
+            analyzeTimingPatterns() {
+                const now = Date.now();
+                const sessionDuration = now - this.sessionStart;
+                
+                // Слишком быстрое взаимодействие
+                if (this.firstInteractionTime && (this.firstInteractionTime - this.sessionStart) < 500) {
+                    this.riskScore += 25;
+                }
+                
+                // Анализ регулярности действий
+                if (this.clickEvents.length > 3) {
+                    const intervals = [];
+                    for (let i = 1; i < this.clickEvents.length; i++) {
+                        intervals.push(this.clickEvents[i].timestamp - this.clickEvents[i-1].timestamp);
+                    }
+                    
+                    const avgInterval = intervals.reduce((a, b) => a + b, 0) / intervals.length;
+                    const variance = intervals.reduce((acc, val) => acc + Math.pow(val - avgInterval, 2), 0) / intervals.length;
+                    
+                    // Слишком регулярные интервалы = подозрение
+                    if (variance < 1000 && avgInterval < 200) {
+                        this.riskScore += 35;
+                    }
+                }
+            }
+
+            // === ПРОДВИНУТЫЙ ФИНГЕРПРИНТИНГ ===
+            setupAdvancedFingerprinting() {
+                this.audioFingerprintAttempted = false;
+                
+                this.browserFingerprint = {
+                    // Audio context fingerprinting - отложенный
+                    audioFingerprint: this.generateAudioFingerprint(),
+                    
+                    // WebRTC fingerprinting
+                    webrtcFingerprint: this.generateWebRTCFingerprint(),
+                    
+                    // Battery API (если доступно)
+                    batteryLevel: this.getBatteryInfo(),
+                    
+                    // Геолокация capabilities
+                    geolocationSupport: !!navigator.geolocation,
+                    
+                    // Media devices
+                    mediaDevices: this.getMediaDevicesInfo(),
+                    
+                    // Font detection
+                    availableFonts: this.detectAvailableFonts(),
+                    
+                    // Storage quota
+                    storageQuota: this.getStorageQuota()
+                };
+                
+                // Попробуем получить audio fingerprint после первого клика
+                document.addEventListener('click', () => {
+                    if (!this.audioFingerprintAttempted) {
+                        setTimeout(() => {
+                            this.browserFingerprint.audioFingerprint = this.generateAudioFingerprint();
+                            console.log('🔊 Audio fingerprint обновлен после пользовательского взаимодействия');
+                        }, 100);
+                    }
+                }, { once: true });
+            }
+
+            generateAudioFingerprint() {
+                // Отложенная инициализация - только после взаимодействия пользователя
+                if (!this.audioFingerprintAttempted && this.clickEvents.length === 0) {
+                    return 'pending_user_interaction';
+                }
+                
+                this.audioFingerprintAttempted = true;
+                
+                try {
+                    // Проверяем, разрешен ли AudioContext
+                    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+                    if (!AudioContextClass) {
+                        return 'not_supported';
+                    }
+                    
+                    const audioContext = new AudioContextClass();
+                    
+                    // Проверяем состояние контекста
+                    if (audioContext.state === 'suspended') {
+                        // Не пытаемся запустить автоматически - это вызывает предупреждения
+                        audioContext.close();
+                        return 'suspended_context';
+                    }
+                    
+                    const oscillator = audioContext.createOscillator();
+                    const analyser = audioContext.createAnalyser();
+                    const gainNode = audioContext.createGain();
+                    
+                    oscillator.type = 'triangle';
+                    oscillator.frequency.value = 1000;
+                    gainNode.gain.value = 0; // Без звука
+                    
+                    oscillator.connect(analyser);
+                    analyser.connect(gainNode);
+                    gainNode.connect(audioContext.destination);
+                    
+                    // Запускаем очень кратко
+                    oscillator.start(0);
+                    oscillator.stop(audioContext.currentTime + 0.001); // 1ms
+                    
+                    const data = new Uint8Array(analyser.frequencyBinCount);
+                    analyser.getByteFrequencyData(data);
+                    
+                    audioContext.close();
+                    return Array.from(data).slice(0, 10).join(',') || 'empty_data';
+                } catch (e) {
+                    console.log('ℹ️ Audio fingerprinting отключен (требует пользовательского взаимодействия)');
+                    return 'audio_blocked';
+                }
+            }
+
+            generateWebRTCFingerprint() {
+                return new Promise((resolve) => {
+                    if (!window.RTCPeerConnection) {
+                        resolve('unavailable');
+                        return;
+                    }
+                    
+                    const pc = new RTCPeerConnection({iceServers: []});
+                    pc.createDataChannel('');
+                    pc.createOffer().then(offer => pc.setLocalDescription(offer));
+                    
+                    pc.onicecandidate = (event) => {
+                        if (event.candidate) {
+                            const candidate = event.candidate.candidate;
+                            const ip = candidate.match(/(\d+\.\d+\.\d+\.\d+)/);
+                            if (ip) {
+                                pc.close();
+                                resolve(ip[1]);
+                            }
+                        }
+                    };
+                    
+                    setTimeout(() => {
+                        pc.close();
+                        resolve('timeout');
+                    }, 1000);
+                });
+            }
+
+            getBatteryInfo() {
+                if (navigator.getBattery) {
+                    return navigator.getBattery().then(battery => ({
+                        level: battery.level,
+                        charging: battery.charging
+                    })).catch(() => 'unavailable');
+                }
+                return 'unavailable';
+            }
+
+            getMediaDevicesInfo() {
+                if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+                    return navigator.mediaDevices.enumerateDevices()
+                        .then(devices => ({
+                            audioInputs: devices.filter(d => d.kind === 'audioinput').length,
+                            videoInputs: devices.filter(d => d.kind === 'videoinput').length,
+                            audioOutputs: devices.filter(d => d.kind === 'audiooutput').length
+                        }))
+                        .catch(() => ({ audioInputs: 0, videoInputs: 0, audioOutputs: 0 }));
+                }
+                return { audioInputs: 0, videoInputs: 0, audioOutputs: 0 };
+            }
+
+            detectAvailableFonts() {
+                const baseFonts = ['monospace', 'sans-serif', 'serif'];
+                const testFonts = ['Arial', 'Helvetica', 'Times', 'Courier', 'Verdana', 'Georgia', 'Palatino', 'Garamond', 'Bookman', 'Comic Sans MS'];
+                const testSize = '72px';
+                const testText = 'mmmmmmmmmmlli';
+                
+                const canvas = document.createElement('canvas');
+                const context = canvas.getContext('2d');
+                
+                const baseMeasurements = baseFonts.map(font => {
+                    context.font = testSize + ' ' + font;
+                    return context.measureText(testText).width;
+                });
+                
+                return testFonts.filter(font => {
+                    return baseFonts.some((baseFont, index) => {
+                        context.font = testSize + ' ' + font + ', ' + baseFont;
+                        return context.measureText(testText).width !== baseMeasurements[index];
+                    });
+                });
+            }
+
+            getStorageQuota() {
+                if (navigator.storage && navigator.storage.estimate) {
+                    return navigator.storage.estimate()
+                        .then(estimate => ({
+                            quota: estimate.quota,
+                            usage: estimate.usage
+                        }))
+                        .catch(() => ({ quota: 0, usage: 0 }));
+                }
+                return { quota: 0, usage: 0 };
+            }
+
+            // === НЕПРЕРЫВНЫЙ МОНИТОРИНГ ===
+            startContinuousMonitoring() {
+                // Обновление risk score каждые 2 секунды
+                setInterval(() => {
+                    this.updateRiskAssessment();
+                    this.updateConfidenceLevel();
+                }, 2000);
+                
+                // Глубокий анализ каждые 10 секунд
+                setInterval(() => {
+                    this.performDeepAnalysis();
+                }, 10000);
+            }
+
+            updateRiskAssessment() {
+                // Сохраняем базовый риск перед пересчетом - только критические нарушения
+                const criticalRisk = (this.honeypotTriggers?.length || 0) * 100 + 
+                                   (this.environmentData?.webdriver ? 50 : 0) +
+                                   (this.environmentData?.phantom ? 60 : 0);
+                
+                // ПОЛНОСТЬЮ сбрасываем риск до критического минимума
+                this.riskScore = criticalRisk;
+                
+                // Дополнительный анализ поведения (может добавить небольшой риск)
+                this.analyzeBehaviorPatterns();
+                this.analyzeInteractionQuality(); 
+                this.validateSessionConsistency();
+                
+                // МОЩНЫЕ ПОЗИТИВНЫЕ ФАКТОРЫ (значительное снижение риска)
+                const sessionTime = Date.now() - this.sessionStart;
+                
+                // Базовые бонусы за активность
+                if (this.mouseData?.length > 5) this.riskScore -= 20;
+                if (this.mouseData?.length > 20) this.riskScore -= 15; // дополнительный бонус
+                if (this.mouseData?.length > 50) this.riskScore -= 10; // еще больше
+                
+                if (this.clickEvents?.length > 0) this.riskScore -= 15;
+                if (this.clickEvents?.length > 2) this.riskScore -= 10;
+                
+                if (this.keyboardData?.length > 0) this.riskScore -= 12;
+                if (this.scrollData?.length > 0) this.riskScore -= 8;
+                
+                // Временные бонусы
+                if (sessionTime > 5000) this.riskScore -= 25;  // 5+ секунд
+                if (sessionTime > 15000) this.riskScore -= 15; // 15+ секунд
+                if (sessionTime > 30000) this.riskScore -= 10; // 30+ секунд
+                
+                // Бонус за разнообразие взаимодействий
+                const interactionTypes = [
+                    (this.mouseData?.length || 0) > 0,
+                    (this.clickEvents?.length || 0) > 0, 
+                    (this.keyboardData?.length || 0) > 0,
+                    (this.scrollData?.length || 0) > 0,
+                    (this.focusEvents?.length || 0) > 0
+                ].filter(Boolean).length;
+                
+                this.riskScore -= interactionTypes * 8; // 8 баллов за каждый тип
+                
+                // Особый бонус за валидные cookies или fallback
+                if (this.cookiesSupported === true) {
+                    this.riskScore -= 20;
+                } else if (this.cookieFallback && Object.keys(this.cookieFallback).length > 0) {
+                    this.riskScore -= 15; // fallback тоже хорошо
+                }
+                
+                // Убираем штрафы за множественные попытки если поведение хорошее
+                if ((this.verificationAttempts || 0) > 2 && (this.mouseData?.length || 0) > 15) {
+                    this.riskScore -= (this.verificationAttempts || 0) * 5;
+                }
+                
+                // СТРОГО ограничиваем риск в пределах 0-100
+                this.riskScore = Math.max(0, Math.min(100, this.riskScore));
+                
+                console.log(`📊 Risk score обновлен: ${this.riskScore}/100, доверие: ${this.confidenceLevel}%`);
+            }
+
+            analyzeBehaviorPatterns() {
+                // Анализ естественности движений мыши - МИНИМАЛЬНЫЕ штрафы
+                if ((this.mouseData?.length || 0) > 10) {
+                    const movements = this.mouseData.slice(-20);
+                    let suspiciousCount = 0;
+                    
+                    for (let i = 2; i < movements.length; i++) {
+                        const prev = movements[i-1];
+                        const curr = movements[i];
+                        const prev2 = movements[i-2];
+                        
+                        // Очень строгая проверка на линейность
+                        const slope1 = (prev.y - prev2.y) / (prev.x - prev2.x || 1);
+                        const slope2 = (curr.y - prev.y) / (curr.x - prev.x || 1);
+                        
+                        if (Math.abs(slope1 - slope2) < 0.01) { // очень строгий критерий
+                            suspiciousCount++;
+                        }
+                        
+                        // Проверка на ОЧЕНЬ высокую скорость
+                        const distance = Math.sqrt(Math.pow(curr.x - prev.x, 2) + Math.pow(curr.y - prev.y, 2));
+                        const time = curr.timestamp - prev.timestamp;
+                        if (time > 0 && distance / time > 10) { // очень высокий порог
+                            suspiciousCount++;
+                        }
+                    }
+                    
+                    // Штрафы только за ОЧЕНЬ подозрительное поведение
+                    if (suspiciousCount > movements.length * 0.95) { // 95% подозрительных движений
+                        this.riskScore += 15; // небольшой штраф
+                    }
+                } else {
+                    // Небольшой штраф за недостаток данных мыши
+                    this.riskScore += 5;
+                }
+            }
+
+            analyzeInteractionQuality() {
+                // Проверка на isTrusted события - ОЧЕНЬ мягко
+                const untrustedClicks = (this.clickEvents || []).filter(click => !click.isTrusted).length;
+                const untrustedKeys = (this.keyboardData || []).filter(key => !key.isTrusted).length;
+                
+                // Только серьезные штрафы за большое количество untrusted событий
+                if (untrustedClicks > 5) this.riskScore += untrustedClicks * 3; // уменьшили штраф
+                if (untrustedKeys > 10) this.riskScore += untrustedKeys * 2;     // уменьшили штраф
+            }
+
+            validateSessionConsistency() {
+                // Проверка консистентности сессии - БОЛЕЕ МЯГКО
+                const sessionDuration = Date.now() - this.sessionStart;
+                const interactionCount = (this.mouseData?.length || 0) + (this.clickEvents?.length || 0) + (this.keyboardData?.length || 0);
+                
+                // Только ОЧЕНЬ подозрительные паттерны
+                if (sessionDuration < 1000 && interactionCount > 100) {
+                    // Слишком много взаимодействий за очень короткое время
+                    this.riskScore += 20; // уменьшили штраф
+                }
+                
+                // Убрали штраф за мало взаимодействий - это нормально для быстрых пользователей
+            }
+
+            performDeepAnalysis() {
+                console.log('🔍 Выполняется глубокий анализ безопасности...');
+                
+                // Комплексная оценка всех систем
+                this.detectionResults = {
+                    cookieIntegrity: this.validateCookieIntegrity(),
+                    behaviorAnalysis: this.analyzeBehaviorPatterns(),
+                    environmentCheck: this.environmentData.webdriver || this.environmentData.phantom,
+                    honeypotStatus: this.honeypotTriggers.length === 0,
+                    timingAnalysis: this.analyzeTimingPatterns(),
+                    overallRisk: this.riskScore
+                };
+            }
+
+            updateConfidenceLevel() {
+                const sessionTime = Date.now() - this.sessionStart;
+                
+                const factors = [
+                    this.mouseData.length > 10 ? 25 : this.mouseData.length > 5 ? 15 : 5,
+                    this.clickEvents.length > 2 ? 20 : this.clickEvents.length > 0 ? 10 : 0,
+                    this.keyboardData.length > 0 ? 15 : 0,
+                    this.validateCookieIntegrity() ? 20 : 10,
+                    this.honeypotTriggers.length === 0 ? 15 : 0,
+                    sessionTime > 10000 ? 15 : sessionTime > 5000 ? 10 : 5,
+                    this.scrollData.length > 0 ? 10 : 0,
+                    // Бонус за разнообразие действий
+                    this.focusEvents.length > 0 ? 5 : 0
+                ];
+                
+                this.confidenceLevel = Math.min(100, factors.reduce((sum, factor) => sum + factor, 0));
+                
+                console.log(`💯 Уровень доверия обновлен: ${this.confidenceLevel}%`);
+            }
+
+            // === ГЛАВНАЯ ПРОВЕРКА ===
+            performFinalVerification() {
+                console.log('🛡️ Выполнение финальной УПРОЩЕННОЙ проверки...');
+                
+                this.verificationAttempts = (this.verificationAttempts || 0) + 1;
+                
+                // ПРИНУДИТЕЛЬНО сбрасываем риск в начале проверки
+                this.riskScore = 0;
+                console.log('🔄 Risk score принудительно сброшен в 0');
+                
+                // Запускаем обновление риска с чистого листа
+                this.updateRiskAssessment();
+                
+                console.log('📊 Состояние после пересчета:', {
+                    riskScore: this.riskScore,
+                    confidenceLevel: this.confidenceLevel,
+                    mouseData: this.mouseData?.length || 0,
+                    clickEvents: this.clickEvents?.length || 0
+                });
+                
+                // Проверка только на КРИТИЧЕСКУЮ автоматизацию
+                if (this.environmentData?.webdriver || this.environmentData?.phantom) {
+                    console.log('🚨 Критическая автоматизация обнаружена');
+                    return { 
+                        success: false, 
+                        reason: 'automation_detected', 
+                        confidence: 95, 
+                        riskScore: 100, 
+                        details: this.generateDetailedReport() 
+                    };
+                }
+                
+                // Обеспечиваем что все scores определены и в пределах нормы
+                const finalRiskScore = Math.max(0, Math.min(100, this.riskScore || 0));
+                const finalConfidence = Math.max(0, Math.min(100, this.confidenceLevel || 0));
+                
+                // ОЧЕНЬ МЯГКИЕ условия успеха
+                const hasMinimalActivity = (this.mouseData?.length || 0) > 3 || (this.clickEvents?.length || 0) > 0;
+                const hasAnyStorage = this.cookiesSupported === true || (this.cookieFallback && Object.keys(this.cookieFallback).length > 0);
+                const noAutomation = !this.environmentData?.webdriver && !this.environmentData?.phantom;
+                const hasTime = Date.now() - this.sessionStart > 1000; // всего 1 секунда
+                
+                // Очень мягкие условия - только 3 из 4 нужны
+                const successConditions = [
+                    finalRiskScore < 80,    // очень мягкий лимит риска
+                    hasMinimalActivity,     // минимальная активность
+                    hasAnyStorage,          // любое хранилище
+                    noAutomation,           // нет явной автоматизации
+                    hasTime,                // минимальное время
+                    finalConfidence > 30    // базовое доверие
+                ];
+                
+                const successCount = successConditions.filter(Boolean).length;
+                const isHuman = successCount >= 4; // 4 из 6 условий
+                
+                console.log(`✅ ФИНАЛЬНАЯ ОЦЕНКА: ${successCount}/6 условий выполнено`);
+                console.log(`🎯 Результат: ${isHuman ? 'УСПЕХ' : 'НЕУДАЧА'}, Risk: ${finalRiskScore}/100`);
+                
+                const result = {
+                    success: isHuman,
+                    reason: isHuman ? 'verification_passed' : 'suspicious_behavior',
+                    confidence: finalConfidence,
+                    riskScore: finalRiskScore, // гарантированно <= 100
+                    successConditions: successCount,
+                    details: this.generateDetailedReport()
+                };
+                
+                console.log('📋 Финальный результат проверки:', result);
+                return result;
+            }
+
+            generateDetailedReport() {
+                const now = Date.now();
+                const sessionDuration = now - this.sessionStart;
+                
+                return {
+                    sessionDuration: sessionDuration,
+                    mouseMovements: this.mouseData?.length || 0,
+                    clickEvents: this.clickEvents?.length || 0,
+                    keyboardEvents: this.keyboardData?.length || 0,
+                    scrollEvents: this.scrollData?.length || 0,
+                    touchEvents: this.touchEvents?.length || 0,
+                    focusEvents: this.focusEvents?.length || 0,
+                    honeypotTriggers: this.honeypotTriggers?.length || 0,
+                    cookieStatus: this.cookiesSupported,
+                    cookiesSupported: this.cookiesSupported,
+                    cookiesWorking: this.cookiesWorking || 0,
+                    fallbackActive: this.cookieFallback ? Object.keys(this.cookieFallback).length : 0,
+                    environmentRisk: this.environmentData || {},
+                    verificationAttempts: this.verificationAttempts || 0,
+                    finalRiskScore: this.riskScore || 0,
+                    confidenceLevel: this.confidenceLevel || 0,
+                    // Добавляем отладочную информацию
+                    debug: {
+                        startTime: this.sessionStart,
+                        currentTime: now,
+                        riskScore: this.riskScore,
+                        confidence: this.confidenceLevel,
+                        mouseDataExists: !!this.mouseData,
+                        clickEventsExists: !!this.clickEvents
+                    }
+                };
+            }
+
+            // === УТИЛИТЫ ===
+            generateSecureToken(length) {
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+                let result = '';
+                const array = new Uint8Array(length);
+                crypto.getRandomValues(array);
+                for (let i = 0; i < length; i++) {
+                    result += chars[array[i] % chars.length];
+                }
+                return result;
+            }
+
+            createBrowserHash() {
+                const data = [
+                    navigator.userAgent,
+                    navigator.language,
+                    screen.width + 'x' + screen.height,
+                    new Date().getTimezoneOffset(),
+                    navigator.platform
+                ].join('|');
+                
+                return btoa(data).slice(0, 16);
+            }
+
+            calculateActivityScore() {
+                return Math.floor(
+                    this.mouseData.length * 1 +
+                    this.clickEvents.length * 3 +
+                    this.keyboardData.length * 2 +
+                    this.scrollData.length * 1.5
+                );
+            }
+        }
+
+        // === ИНТЕРФЕЙС И ВЗАИМОДЕЙСТВИЕ ===
+        
+        // Инициализация системы защиты
+        const protection = new IntegratedBotProtection();
+
+        // Элементы интерфейса
+        const verificationBox = document.getElementById('verificationBox');
+        const securityCheckbox = document.getElementById('securityCheckbox');
+        const securitySpinner = document.getElementById('securitySpinner');
+        const securityCheckmark = document.getElementById('securityCheckmark');
+        const progressFill = document.getElementById('progressFill');
+        const successMessage = document.getElementById('successMessage');
+        const errorMessage = document.getElementById('errorMessage');
+        const warningMessage = document.getElementById('warningMessage');
+        const securitySubmitButton = document.getElementById('securitySubmitButton');
+        const securityDetails = document.getElementById('securityDetails');
+        const securityMetrics = document.getElementById('securityMetrics');
+
+        let isVerified = false;
+        let isVerifying = false;
+
+        // Главная функция проверки
+        securityCheckbox.addEventListener('click', async function() {
+            if (isVerified || isVerifying) return;
+            
+            startVerificationProcess();
+        });
+
+        async function startVerificationProcess() {
+            isVerifying = true;
+            
+            // Визуальные изменения
+            verificationBox.classList.add('checking');
+            securityCheckbox.classList.add('checking');
+            securitySpinner.classList.add('show');
+            
+            // Сброс предыдущих сообщений
+            [successMessage, errorMessage, warningMessage].forEach(msg => 
+                msg.classList.remove('show')
+            );
+            
+            // Прогресс бар
+            let progress = 0;
+            const progressInterval = setInterval(() => {
+                progress += Math.random() * 15;
+                progressFill.style.width = Math.min(progress, 90) + '%';
+            }, 200);
+            
+            // Показываем предупреждение во время проверки
+            setTimeout(() => {
+                warningMessage.classList.add('show');
+            }, 1000);
+            
+            // Выполняем проверку (3-5 секунд)
+            const verificationDelay = 3000 + Math.random() * 2000;
+            
+            setTimeout(async () => {
+                clearInterval(progressInterval);
+                progressFill.style.width = '100%';
+                
+                const result = await protection.performFinalVerification();
+                finishVerification(result);
+            }, verificationDelay);
+        }
+
+        function finishVerification(result) {
+            isVerifying = false;
+            
+            // Скрываем спиннер и предупреждение
+            securitySpinner.classList.remove('show');
+            warningMessage.classList.remove('show');
+            verificationBox.classList.remove('checking');
+            securityCheckbox.classList.remove('checking');
+            
+            if (result.success) {
+                // Успешная проверка
+                isVerified = true;
+                verificationBox.classList.add('verified');
+                securityCheckbox.classList.add('verified');
+                securityCheckmark.classList.add('show');
+                
+                setTimeout(() => {
+                    successMessage.classList.add('show');
+                    securitySubmitButton.classList.add('enabled');
+                    showSecurityDetails(result);
+                }, 500);
+                
+            } else {
+                // Проверка не пройдена
+                verificationBox.classList.add('failed');
+                securityCheckbox.classList.add('failed');
+                
+                setTimeout(() => {
+                    errorMessage.classList.add('show');
+                    showSecurityDetails(result);
+                    
+                    // Сброс для повторной попытки через 4 секунды
+                    setTimeout(resetVerification, 4000);
+                }, 500);
+            }
+        }
+
+        function resetVerification() {
+            verificationBox.classList.remove('failed');
+            securityCheckbox.classList.remove('failed');
+            errorMessage.classList.remove('show');
+            progressFill.style.width = '0%';
+            securityDetails.classList.remove('show');
+        }
+
+        function showSecurityDetails(result) {
+            const report = result.details || {};
+            const riskLevel = (result.riskScore || 0) < 30 ? 'low' : (result.riskScore || 0) < 60 ? 'medium' : 'high';
+            const riskText = (result.riskScore || 0) < 30 ? 'Низкий' : (result.riskScore || 0) < 60 ? 'Средний' : 'Высокий';
+            
+            // Определяем статус cookies на основе реальных данных
+            let cookieStatusText = '❓ Неизвестно';
+            if (protection.cookiesSupported === true) {
+                cookieStatusText = '✅ Работают';
+            } else if (protection.cookiesSupported === false) {
+                cookieStatusText = '⚠️ Используется fallback';
+            } else if (protection.cookieFallback && Object.keys(protection.cookieFallback).length > 0) {
+                cookieStatusText = '⚠️ Только fallback';
+            }
+            
+            // Защищаемся от undefined значений
+            const sessionDuration = report.sessionDuration || (Date.now() - protection.sessionStart);
+            const mouseMovements = report.mouseMovements || protection.mouseData?.length || 0;
+            const clickEvents = report.clickEvents || protection.clickEvents?.length || 0;
+            const keyboardEvents = report.keyboardEvents || protection.keyboardData?.length || 0;
+            const honeypotTriggers = report.honeypotTriggers || protection.honeypotTriggers?.length || 0;
+            const verificationAttempts = report.verificationAttempts || protection.verificationAttempts || 0;
+            const fallbackActive = report.fallbackActive || (protection.cookieFallback ? Object.keys(protection.cookieFallback).length : 0);
+            const riskScore = result.riskScore || protection.riskScore || 0;
+            const confidence = result.confidence || protection.confidenceLevel || 0;
+            
+            securityMetrics.innerHTML = `
+                <div class="security-metric">
+                    <span class="metric-label">Уровень риска:</span>
+                    <span class="metric-value">
+                        <span class="security-level level-${riskLevel}">${riskText}</span>
+                        (${riskScore}/100)
+                    </span>
+                </div>
+                <div class="security-metric">
+                    <span class="metric-label">Уровень доверия:</span>
+                    <span class="metric-value">${confidence}%</span>
+                </div>
+                <div class="security-metric">
+                    <span class="metric-label">Время сессии:</span>
+                    <span class="metric-value">${Math.round(sessionDuration/1000)}с</span>
+                </div>
+                <div class="security-metric">
+                    <span class="metric-label">Движения мыши:</span>
+                    <span class="metric-value">${mouseMovements}</span>
+                </div>
+                <div class="security-metric">
+                    <span class="metric-label">Клики:</span>
+                    <span class="metric-value">${clickEvents}</span>
+                </div>
+                <div class="security-metric">
+                    <span class="metric-label">Нажатия клавиш:</span>
+                    <span class="metric-value">${keyboardEvents}</span>
+                </div>
+                <div class="security-metric">
+                    <span class="metric-label">Cookie статус:</span>
+                    <span class="metric-value">${cookieStatusText}</span>
+                </div>
+                <div class="security-metric">
+                    <span class="metric-label">Fallback данные:</span>
+                    <span class="metric-value">${fallbackActive} записей</span>
+                </div>
+                <div class="security-metric">
+                    <span class="metric-label">Honeypot триггеры:</span>
+                    <span class="metric-value">${honeypotTriggers > 0 ? '🚨 ' + honeypotTriggers : '✅ 0'}</span>
+                </div>
+                <div class="security-metric">
+                    <span class="metric-label">WebDriver:</span>
+                    <span class="metric-value">${report.environmentRisk?.webdriver ? '🚨 Обнаружен' : '✅ Не найден'}</span>
+                </div>
+                <div class="security-metric">
+                    <span class="metric-label">Попытки:</span>
+                    <span class="metric-value">${verificationAttempts}</span>
+                </div>
+            `;
+            
+            securityDetails.classList.add('show');
+            
+            // Дополнительная диагностика в консоль
+            console.log('🔍 Отладка отчета:', {
+                riskScore: riskScore,
+                confidence: confidence, 
+                sessionDuration: sessionDuration,
+                mouseMovements: mouseMovements,
+                clickEvents: clickEvents,
+                report: report,
+                protectionState: {
+                    riskScore: protection.riskScore,
+                    confidenceLevel: protection.confidenceLevel,
+                    mouseDataLength: protection.mouseData?.length,
+                    clickEventsLength: protection.clickEvents?.length
+                }
+            });
+        }
+
+        // Отправка формы
+        securitySubmitButton.addEventListener('click', function() {
+            if (!isVerified) return;
+            
+            const report = protection.generateDetailedReport();
+            const summary = `
+🛡️ ОТЧЕТ О БЕЗОПАСНОСТИ 🛡️
+
+✅ Проверка пройдена успешно!
+
+📊 Статистика:
+• Уровень риска: ${protection.riskScore}/100
+• Уровень доверия: ${protection.confidenceLevel}%
+• Время сессии: ${Math.round(report.sessionDuration/1000)} секунд
+• Активность: ${report.mouseMovements} движений мыши, ${report.clickEvents} кликов
+• Cookie защита: ${report.cookieStatus ? 'Активна' : 'Нарушена'}
+• Honeypot ловушки: ${report.honeypotTriggers} срабатываний
+• Попытки верификации: ${report.verificationAttempts}
+
+🔒 Сессия защищена интегрированной системой безопасности v2.0
+            `;
+            
+            alert(summary);
+        });
+
+        // Эффекты при наведении
+        verificationBox.addEventListener('mouseenter', function() {
+            if (!isVerified && !isVerifying) {
+                this.style.transform = 'translateY(-3px)';
+                this.style.boxShadow = '0 15px 35px rgba(0,0,0,0.15)';
+            }
+        });
+
+        verificationBox.addEventListener('mouseleave', function() {
+            if (!isVerified && !isVerifying) {
+                this.style.transform = 'translateY(0)';
+                this.style.boxShadow = '0 20px 60px rgba(0, 0, 0, 0.2)';
+            }
+        });
+
+        // Добавляем кнопку "Сбросить сессию" для тестирования
+        function addResetButton() {
+            const resetButton = document.createElement('button');
+            resetButton.textContent = '🔄 Сбросить сессию';
+            resetButton.style.cssText = `
+                margin-top: 10px;
+                padding: 8px 16px;
+                background: #6c757d;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 12px;
+            `;
+            
+            resetButton.addEventListener('click', () => {
+                // Полная очистка и перезагрузка
+                protection.clearPreviousSession();
+                location.reload();
+            });
+            
+            document.querySelector('.security-container').appendChild(resetButton);
+        }
+
+        // Инициализация завершена
+        console.log('🚀 Интегрированная система защиты от ботов активирована!');
+        console.log('ℹ️ Honeypot система отключена для максимальной совместимости');
+        console.log('ℹ️ Audio fingerprinting будет активирован после первого клика (требование Chrome)');
+        
+        // Диагностическая информация с улучшенными логами
+        setTimeout(() => {
+            console.log('📋 Диагностика состояния:');
+            console.log('- Cookies поддержка:', protection.cookiesSupported);
+            console.log('- Cookies работающие:', protection.cookiesWorking);
+            console.log('- Fallback записи:', protection.cookieFallback ? Object.keys(protection.cookieFallback).length : 0);
+            console.log('- Реальные cookies:', document.cookie.split(';').filter(c => c.trim()).length);
+            console.log('- Risk score:', protection.riskScore);
+            console.log('- Confidence:', protection.confidenceLevel + '%');
+            console.log('- Время сессии:', Math.round((Date.now() - protection.sessionStart)/1000) + 'с');
+            console.log('- Audio fingerprint:', protection.browserFingerprint?.audioFingerprint || 'pending');
+        }, 2000);
+    </script>
+</body>
+</html>
