@@ -11,8 +11,8 @@ define('DB_PASS', 'dosPASS');          // Пароль базы данных
 
 // https://www.google.com/recaptcha/admin/create
 // Настройки reCAPTCHA (замените на свои ключи от Google)
-define('RECAPTCHA_SITE_KEY', '6LdUJ-QqAAAAAIEV92hvlfEd33333O5WKmLpJi');  // Публичный ключ
-define('RECAPTCHA_SECRET_KEY', '6LdUJ-QqAAAAAKMW2D7_y3333338U0mdRk'); // Секретный ключ
+//define('RECAPTCHA_SITE_KEY', '');  // Публичный ключ
+//define('RECAPTCHA_SECRET_KEY', ''); // Секретный ключ
 
 // Настройки администратора
 define('ADMIN_USERNAME', 'username'); // Имя пользователя для доступа к админ-панели
