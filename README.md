@@ -34,7 +34,7 @@ Multi-layered protection system against DoS/DDoS attacks with progressive blocki
 2. Create a MySQL/MariaDB database and user
 3. Edit the `settings.php` file:
 - Specify the connection settings to the database
-- Set reCAPTCHA keys
+- Set reCAPTCHA keys - not necessary - there is its own AI protection
 - Configure blocking mechanisms
 4. Configure the execution of `cleanup.php` via cron every hour:
 ```
