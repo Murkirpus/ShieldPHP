@@ -16,6 +16,72 @@ class RecaptchaUnlock {
     private $failure_window = 3600;
     private $max_visits = 10;
     private $visits_window = 300;
+	
+	/**
+ * Полная очистка всех файловых счетчиков
+ */
+private function cleanupAllFileCounters() {
+    $directories = [
+        'minute_requests/',
+        'total_requests/',
+        'ip_requests/',
+        'ua_tracking/'
+    ];
+    
+    foreach ($directories as $dir) {
+        $fullPath = $this->dos_dir . $dir;
+        if (is_dir($fullPath)) {
+            $this->cleanDirectoryFiles($fullPath, $this->ip);
+        }
+    }
+    
+    // Очищаем лог файлы связанные с IP
+    $logFiles = [
+        'unlock_attempts.log',
+        'unlock_visits.log'
+    ];
+    
+    foreach ($logFiles as $logFile) {
+        $this->cleanLogFile($this->dos_dir . $logFile, $this->ip);
+    }
+}
+
+/**
+ * Очистка файлов в директории для конкретного IP
+ */
+private function cleanDirectoryFiles($dir, $ip) {
+    if (!is_dir($dir)) return;
+    
+    $ipSafe = str_replace([':', '.'], '_', $ip);
+    $files = glob($dir . $ipSafe . '*');
+    
+    foreach ($files as $file) {
+        if (is_file($file)) {
+            @unlink($file);
+        }
+    }
+}
+
+/**
+ * Очистка записей IP из лог файла
+ */
+private function cleanLogFile($logFile, $ip) {
+    if (!file_exists($logFile)) return;
+    
+    $content = file_get_contents($logFile);
+    if ($content === false) return;
+    
+    $lines = explode("\n", $content);
+    $newLines = [];
+    
+    foreach ($lines as $line) {
+        if (strpos($line, $ip) === false) {
+            $newLines[] = $line;
+        }
+    }
+    
+    file_put_contents($logFile, implode("\n", $newLines));
+}
     
     public function __construct() {
         $this->ip = $this->getClientIP();
@@ -510,97 +576,134 @@ class RecaptchaUnlock {
     /**
      * Разблокировка IP через Redis
      */
-    public function unblockIPRedis() {
-        if (!$this->redis) return false;
+    /**
+ * Улучшенная разблокировка IP через Redis
+ */
+public function unblockIPRedis() {
+    if (!$this->redis) return false;
+    
+    try {
+        $blockKey = $this->prefix . "blocked_ip:{$this->ip}";
         
-        try {
-            $blockKey = $this->prefix . "blocked_ip:{$this->ip}";
-            
-            if (!$this->redis->exists($blockKey)) {
-                return true;
-            }
-            
-            // Удаляем из Redis
-            $this->redis->del($blockKey);
-            $this->redis->zRem($this->prefix . "blocked_ips", $this->ip);
-            
-            // Выполняем внешние разблокировки
-            $this->removeIPFromConf($this->ip);
-            $this->removeIPFromHtaccess($this->ip);
-            $this->unblockIPFromIptables($this->ip);
-            $this->unblockIPViaAPI($this->ip);
-            
-            // Сбрасываем счетчики запросов для IP
-            $this->redis->del($this->prefix . "ip_request_rate:{$this->ip}");
-            $this->redis->del($this->prefix . "minute_requests:{$this->ip}");
-            $this->redis->del($this->prefix . "total_requests:{$this->ip}");
-            
-            // Логируем разблокировку
-            $this->redis->lPush($this->prefix . "unblock_log", json_encode([
-                'ip' => $this->ip,
-                'time' => time(),
-                'method' => 'recaptcha'
-            ]));
-            $this->redis->ltrim($this->prefix . "unblock_log", 0, 999);
-            
-            // Сбрасываем сессионные счетчики
-            if (session_status() == PHP_SESSION_ACTIVE) {
-                $_SESSION['page_requests'] = array();
-                $_SESSION['requests_log'] = array();
-                $_SESSION['request_count'] = 0;
-                $_SESSION['last_request_time'] = time();
-            }
-            
-            return true;
-        } catch (Exception $e) {
-            error_log("Error unblocking IP in Redis: " . $e->getMessage());
-            return false;
+        // Полная очистка всех связанных ключей Redis
+        $keysToDelete = [
+            $blockKey,
+            $this->prefix . "ip_request_rate:{$this->ip}",
+            $this->prefix . "minute_requests:{$this->ip}",
+            $this->prefix . "total_requests:{$this->ip}",
+            $this->prefix . "unlock_visits:{$this->ip}",
+            $this->prefix . "suspicious_requests:{$this->ip}",
+            $this->prefix . "throttle:{$this->ip}:default",
+            $this->prefix . "throttle:{$this->ip}:api",
+            $this->prefix . "throttle:{$this->ip}:login",
+            $this->prefix . "throttle:{$this->ip}:search"
+        ];
+        
+        // Удаляем все ключи
+        foreach ($keysToDelete as $key) {
+            $this->redis->del($key);
         }
+        
+        // Удаляем из sorted set
+        $this->redis->zRem($this->prefix . "blocked_ips", $this->ip);
+        $this->redis->zRem($this->prefix . "suspicious_ips", $this->ip);
+        
+        // Выполняем внешние разблокировки
+        $this->removeIPFromConf($this->ip);
+        $this->removeIPFromHtaccess($this->ip);
+        $this->unblockIPFromIptables($this->ip);
+        $this->unblockIPViaAPI($this->ip);
+        
+        // Обновляем файловый кэш
+        $this->updateBlockedIPsCache();
+        
+        // Очищаем файловые счетчики
+        $this->cleanupAllFileCounters();
+        
+        // Сбрасываем сессионные счетчики
+        if (session_status() == PHP_SESSION_ACTIVE) {
+            unset($_SESSION['page_requests']);
+            unset($_SESSION['requests_log']);
+            unset($_SESSION['request_count']);
+            unset($_SESSION['last_request_time']);
+            unset($_SESSION['url_sequence']);
+            unset($_SESSION['referrer_history']);
+            unset($_SESSION['request_sizes']);
+            unset($_SESSION['http_methods']);
+            unset($_SESSION['request_intervals']);
+            unset($_SESSION['request_timings']);
+            session_regenerate_id(true);
+        }
+        
+        // Логируем разблокировку
+        $this->redis->lPush($this->prefix . "unblock_log", json_encode([
+            'ip' => $this->ip,
+            'time' => time(),
+            'method' => 'recaptcha_enhanced'
+        ]));
+        $this->redis->ltrim($this->prefix . "unblock_log", 0, 999);
+        
+        error_log("IP {$this->ip} полностью разблокирован через улучшенный метод Redis");
+        
+        return true;
+    } catch (Exception $e) {
+        error_log("Error in enhanced unblock IP Redis: " . $e->getMessage());
+        return false;
     }
+}
     
     /**
      * Разблокировка IP через БД
      */
-    public function unblockIPDB() {
-        try {
-            if (!$this->db) {
-                return false;
-            }
-            
-            // Сначала выполняем все операции разблокировки через внешние системы
-            $this->removeIPFromConf($this->ip);
-            $this->removeIPFromHtaccess($this->ip);
-            $this->unblockIPFromIptables($this->ip);
-            $this->unblockIPViaAPI($this->ip);
-            
-            // Затем удаляем из базы данных
-            $stmt = $this->db->prepare("DELETE FROM blocked_ips WHERE ip = ?");
-            $result = $stmt->execute(array($this->ip));
-            
-            if ($result) {
-                // Обновляем кеш блокировок
-                $this->updateBlockedIPsCache();
-                
-                // Сбрасываем счетчики запросов для IP
-                $this->db->prepare("DELETE FROM ip_request_rate WHERE ip = ?")->execute(array($this->ip));
-                
-                // Сбрасываем сессионные счетчики
-                if (session_status() == PHP_SESSION_ACTIVE) {
-                    $_SESSION['page_requests'] = array();
-                    $_SESSION['requests_log'] = array();
-                    $_SESSION['request_count'] = 0;
-                    $_SESSION['last_request_time'] = time();
-                }
-                
-                return true;
-            }
-            
-            return false;
-        } catch(PDOException $e) {
-            error_log("Error unblocking IP: " . $e->getMessage());
+    /**
+ * Улучшенная разблокировка IP через БД
+ */
+public function unblockIPDB() {
+    try {
+        if (!$this->db) {
             return false;
         }
+        
+        // Выполняем все операции разблокировки через внешние системы
+        $this->removeIPFromConf($this->ip);
+        $this->removeIPFromHtaccess($this->ip);
+        $this->unblockIPFromIptables($this->ip);
+        $this->unblockIPViaAPI($this->ip);
+        
+        // Удаляем из всех таблиц БД
+        $tables = ['blocked_ips', 'suspicious_requests', 'ip_request_rate'];
+        foreach ($tables as $table) {
+            try {
+                $stmt = $this->db->prepare("DELETE FROM `$table` WHERE ip = ?");
+                $stmt->execute(array($this->ip));
+            } catch (PDOException $e) {
+                error_log("Error deleting from $table: " . $e->getMessage());
+            }
+        }
+        
+        // Обновляем кеш блокировок
+        $this->updateBlockedIPsCache();
+        
+        // Очищаем файловые счетчики
+        $this->cleanupAllFileCounters();
+        
+        // Сбрасываем сессионные счетчики
+        if (session_status() == PHP_SESSION_ACTIVE) {
+            unset($_SESSION['page_requests']);
+            unset($_SESSION['requests_log']);
+            unset($_SESSION['request_count']);
+            unset($_SESSION['last_request_time']);
+            session_regenerate_id(true);
+        }
+        
+        error_log("IP {$this->ip} полностью разблокирован через улучшенный метод БД");
+        
+        return true;
+    } catch(PDOException $e) {
+        error_log("Error in enhanced unblock IP DB: " . $e->getMessage());
+        return false;
     }
+}
     
     /**
      * Обобщенный метод разблокировки IP
