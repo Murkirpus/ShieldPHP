@@ -2304,7 +2304,8 @@ private function isRequestSuspicious() {
         $this->redirectToUnlockPage();
         exit;
     }
-    
+	
+if (ENABLE_BOT_DETECTION) {    
     // Проверка на типичные признаки бота
     $ua = strtolower($user_agent);
     $bot_terms = array('bot', 'crawler', 'spider', 'grab', 'download', 'fetch', 'parser');
@@ -2334,7 +2335,7 @@ private function isRequestSuspicious() {
             exit;
         }
     }
-        
+}        
     // Инициализируем сессию
     if (session_status() == PHP_SESSION_NONE) {
         if (version_compare(PHP_VERSION, '7.1.0', '>=')) {
