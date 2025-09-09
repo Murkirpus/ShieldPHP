@@ -227,4 +227,6 @@ $ALLOWED_SEARCH_BOTS = array(
 	),
     // Добавьте других ботов по необходимости
 );
+// Блокировка ботов 'bot', 'crawler', 'spider', 'grab', 'download', 'fetch', 'parser'
+define('ENABLE_BOT_DETECTION', false); // или true для включения
 ?>
