@@ -229,17 +229,4 @@ $ALLOWED_SEARCH_BOTS = array(
 );
 // Блокировка ботов 'bot', 'crawler', 'spider', 'grab', 'download', 'fetch', 'parser'
 define('ENABLE_BOT_DETECTION', false); // или true для включения
-
-// Настройки анализа паттернов
-define('ENABLE_PATTERN_ANALYSIS', true);         // Включить анализ паттернов
-define('PATTERN_ANALYSIS_THRESHOLD', 80);        // Порог подозрительности (баллы)
-define('PATTERN_ANALYSIS_LOG_LEVEL', 'INFO');    // Уровень логирования
-
-// Настройки для отдельных анализаторов
-define('URL_SEQUENCE_WEIGHT', 30);               // Вес анализа последовательности URL
-define('HEADER_PATTERN_WEIGHT', 25);             // Вес анализа заголовков
-define('REFERRER_PATTERN_WEIGHT', 20);           // Вес анализа рефереров
-define('REQUEST_SIZE_WEIGHT', 15);               // Вес анализа размеров запросов
-define('HTTP_METHOD_WEIGHT', 20);                // Вес анализа HTTP методов
-define('GEOLOCATION_WEIGHT', 10);                // Вес геолокационного анализа
 ?>
