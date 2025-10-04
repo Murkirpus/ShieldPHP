@@ -1,4 +1,4 @@
-Redis MurKir Security v2.1 13.08.2025 - This is a new alternative revolutionary solution - only saves from stupid bots!
+Redis MurKir Security v2.1 13.08.2025 - This is a new alternative revolutionary solution!
 https://github.com/Murkirpus/Redis-Bot-Protection
 
 # ShieldPHP
